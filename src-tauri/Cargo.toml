@@ -30,6 +30,7 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
+calamine = "0.38.0"
 tempfile = "3"
 
 [profile.release]

@@ -6,6 +6,7 @@ mod barang;
 mod db;
 mod batal;
 mod kas;
+mod laporan;
 mod keluar;
 mod masuk;
 

@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 pub mod auth;
 pub mod barang;
 pub mod kas;
+pub mod laporan;
 pub mod pengguna;
 pub mod stok;
 

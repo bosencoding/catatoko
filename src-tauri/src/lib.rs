@@ -2,14 +2,17 @@ pub mod akses;
 pub mod auth;
 pub mod barang;
 pub mod db;
+pub mod ekspor;
 pub mod foto;
 pub mod galat;
 pub mod jalur;
 pub mod kas;
+pub mod laporan;
 pub mod log;
 pub mod pengaturan;
 pub mod pengguna;
 pub mod perintah;
+pub mod ringkasan;
 pub mod state;
 pub mod stok;
 #[cfg(test)]
@@ -92,6 +95,9 @@ pub fn run() {
             p::stok::stok_sesuaikan,
             p::stok::penyesuaian_batal,
             p::stok::penyesuaian_daftar,
+            p::laporan::ringkasan,
+            p::laporan::laporan_buat,
+            p::laporan::laporan_ekspor,
         ])
         .run(tauri::generate_context!())
         .expect("gagal menjalankan aplikasi");
