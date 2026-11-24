@@ -83,6 +83,9 @@ pub fn run() {
             p::stok::masuk_tambah,
             p::stok::masuk_daftar,
             p::stok::kiriman_barang,
+            p::stok::usul_alokasi,
+            p::stok::keluar_tambah,
+            p::stok::keluar_daftar,
         ])
         .run(tauri::generate_context!())
         .expect("gagal menjalankan aplikasi");

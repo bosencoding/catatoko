@@ -5,6 +5,7 @@ mod auth;
 mod barang;
 mod db;
 mod kas;
+mod keluar;
 mod masuk;
 
 /// DB memori dengan pemilik (id 1) dan staf (id 2), tanpa lewat Argon2.
@@ -92,4 +93,23 @@ pub fn skenario() -> Skenario {
 
 pub fn sisa(c: &Connection, kiriman: i64) -> i64 {
     c.query_row("SELECT sisa FROM kiriman WHERE id=?1", [kiriman], |r| r.get(0)).unwrap()
+}
+
+pub fn jual(barang: i64, harga: i64, alokasi: &[(i64, i64)]) -> crate::stok::KeluarMasukan {
+    crate::stok::KeluarMasukan {
+        tanggal: HARI_INI.into(),
+        akun_kas_id: 1,
+        catatan: None,
+        baris: vec![crate::stok::BarisKeluarMasukan {
+            barang_id: barang,
+            harga_jual: harga,
+            alokasi: alokasi.iter().map(|&(kiriman_id, jumlah)| crate::stok::Alokasi { kiriman_id, jumlah }).collect(),
+        }],
+        izinkan_kedaluwarsa: false,
+    }
+}
+
+/// Menjual 3 karung @ Rp 450.000 dari skenario: 2 dari Sep, 1 dari Okt.
+pub fn jual_tiga(s: &Skenario) -> i64 {
+    crate::stok::keluar(&s.c, &pemilik(), jual(s.barang, 450_000, &[(s.sep, 2_000), (s.okt, 1_000)]), HARI_INI).unwrap()
 }
