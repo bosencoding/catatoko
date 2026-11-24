@@ -1,6 +1,7 @@
 pub mod akses;
 pub mod auth;
 pub mod barang;
+pub mod cadangan;
 pub mod db;
 pub mod ekspor;
 pub mod foto;
@@ -98,6 +99,8 @@ pub fn run() {
             p::laporan::ringkasan,
             p::laporan::laporan_buat,
             p::laporan::laporan_ekspor,
+            p::cadangan::cadangan_buat,
+            p::cadangan::cadangan_pulihkan,
         ])
         .run(tauri::generate_context!())
         .expect("gagal menjalankan aplikasi");

@@ -5,6 +5,7 @@ mod auth;
 mod barang;
 mod db;
 mod batal;
+mod cadangan;
 mod kas;
 mod laporan;
 mod keluar;

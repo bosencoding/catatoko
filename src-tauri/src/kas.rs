@@ -98,7 +98,7 @@ fn rupiah(n: i64) -> String {
     let s = n.abs().to_string();
     let mut hasil = String::new();
     for (i, ch) in s.chars().enumerate() {
-        if i > 0 && (s.len() - i) % 3 == 0 {
+        if i > 0 && (s.len() - i).is_multiple_of(3) {
             hasil.push('.');
         }
         hasil.push(ch);
@@ -149,7 +149,7 @@ pub fn daftar(conn: &Connection, s: &Sesi, f: &SaringKas) -> Hasil<Vec<BarisKas>
             saldo += if b.arah == "masuk" { b.jumlah } else { -b.jumlah };
         }
         b.saldo = saldo;
-        let lolos = f.kategori_id.map_or(true, |k| k == b.kategori_id) && f.arah.as_deref().map_or(true, |a| a == b.arah);
+        let lolos = f.kategori_id.is_none_or(|k| k == b.kategori_id) && f.arah.as_deref().is_none_or(|a| a == b.arah);
         if lolos {
             hasil.push(b);
         }

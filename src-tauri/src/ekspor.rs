@@ -14,7 +14,7 @@ fn rupiah(n: i64) -> String {
     let s = n.abs().to_string();
     let mut hasil = String::new();
     for (i, ch) in s.chars().enumerate() {
-        if i > 0 && (s.len() - i) % 3 == 0 {
+        if i > 0 && (s.len() - i).is_multiple_of(3) {
             hasil.push('.');
         }
         hasil.push(ch);
@@ -150,7 +150,7 @@ fn lebar_huruf(c: char, tebal: bool) -> f32 {
         'm' | 'M' | 'W' => 833.0,
         'w' => 722.0,
         'A'..='Z' => 690.0,
-        's' | 'c' | 'k' | 'v' | 'x' | 'y' | 'z' | 'J' => 500.0,
+        's' | 'c' | 'k' | 'v' | 'x' | 'y' | 'z' => 500.0,
         _ => 556.0,
     };
     if tebal { w * 1.06 } else { w }

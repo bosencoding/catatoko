@@ -131,10 +131,10 @@ pub fn ringkasan(conn: &Connection, s: &Sesi, dari: &str, sampai: &str, butir: B
             keluar: jumlah(&format!("SELECT COALESCE(SUM(bk.jumlah),0) {JUAL}"), &[awal, akhir])?,
         });
     }
-    let mut q = conn.prepare(&format!(
+    let mut q = conn.prepare(
         "SELECT b.nama, SUM(bk.jumlah) FROM baris_keluar bk JOIN transaksi_keluar t ON t.id=bk.transaksi_id JOIN kiriman k ON k.id=bk.kiriman_id
-         JOIN barang b ON b.id=k.barang_id WHERE t.batal=0 AND t.tanggal BETWEEN ?1 AND ?2 GROUP BY b.id ORDER BY 2 DESC, b.nama LIMIT 5"
-    ))?;
+         JOIN barang b ON b.id=k.barang_id WHERE t.batal=0 AND t.tanggal BETWEEN ?1 AND ?2 GROUP BY b.id ORDER BY 2 DESC, b.nama LIMIT 5",
+    )?;
     r.terlaris = q.query_map(params![dari, sampai], |x| Ok((x.get(0)?, x.get(1)?)))?.collect::<Result<_, _>>()?;
     r.stok_menipis = barang::daftar(conn, s, None, false)?.into_iter().filter(|b| b.stok_minimum > 0 && b.stok < b.stok_minimum).collect();
     let batas = (hari + Duration::days(30)).to_string();
