@@ -23,6 +23,20 @@ pub(crate) fn teks_jumlah(milli: i64) -> String {
     format!("{}{utuh},{}", if milli < 0 && utuh == 0 { "-" } else { "" }, p.trim_end_matches('0'))
 }
 
+/// Batas wajar agar perkalian jumlah × harga tidak pernah meluap: 1 juta satuan, Rp 1 miliar per satuan.
+pub(crate) const JUMLAH_MAKS: i64 = 1_000_000_000;
+pub(crate) const HARGA_MAKS: i64 = 1_000_000_000;
+
+pub(crate) fn periksa_batas(jumlah: i64, harga: i64) -> Hasil<()> {
+    if jumlah.abs() > JUMLAH_MAKS {
+        return Err(Galat::validasi("Jumlah barang terlalu besar (maksimal 1.000.000 satuan per catatan)."));
+    }
+    if harga > HARGA_MAKS {
+        return Err(Galat::validasi("Harga per satuan terlalu besar (maksimal Rp 1.000.000.000)."));
+    }
+    Ok(())
+}
+
 fn rapikan(teks: Option<String>) -> Option<String> {
     teks.map(|t| t.trim().to_string()).filter(|t| !t.is_empty())
 }
@@ -128,6 +142,7 @@ pub fn masuk(conn: &Connection, data: &Path, s: &Sesi, mut m: MasukMasukan) -> H
     if m.harga_beli < 0 {
         return Err(Galat::validasi("Harga beli tidak boleh negatif."));
     }
+    periksa_batas(m.jumlah, m.harga_beli)?;
     let (nama, satuan) = barang_aktif(conn, m.barang_id)?;
     m.spek = rapikan(m.spek);
     m.pemasok = rapikan(m.pemasok);
@@ -275,19 +290,37 @@ pub struct TransaksiKeluar {
 
 /// Mengusulkan kiriman yang diambil: tanggal masuk terlama dulu, melewati yang sudah kedaluwarsa.
 pub fn usul_alokasi(conn: &Connection, s: &Sesi, barang_id: i64, jumlah: i64, hari_ini: &str) -> Hasil<Vec<Alokasi>> {
+    usul_alokasi_sisa(conn, s, barang_id, jumlah, hari_ini, &[])
+}
+
+/// Seperti `usul_alokasi`, tetapi menganggap `terpakai` sudah diambil (oleh baris lain pada
+/// transaksi yang sama dan belum tersimpan), sehingga dua baris tidak berebut kiriman yang sama.
+pub fn usul_alokasi_sisa(conn: &Connection, s: &Sesi, barang_id: i64, jumlah: i64, hari_ini: &str, terpakai: &[Alokasi]) -> Hasil<Vec<Alokasi>> {
     wajib(s, Modul::BarangKeluar, Tingkat::Lihat)?;
     waktu::tanggal(hari_ini)?;
     if jumlah <= 0 {
         return Err(Galat::validasi("Jumlah barang harus lebih dari nol."));
     }
+    periksa_batas(jumlah, 0)?;
     let (nama, satuan) = barang_aktif(conn, barang_id)?;
     let mut q = conn.prepare(&format!(
         "SELECT k.id, k.sisa, (k.kedaluwarsa IS NOT NULL AND k.kedaluwarsa < ?2) FROM kiriman k
          WHERE k.barang_id=?1 AND k.batal=0 AND k.sisa>0 ORDER BY {URUT_KIRIMAN}"
     ))?;
-    let kiriman: Vec<(i64, i64, bool)> = q.query_map(params![barang_id, hari_ini], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect::<Result<_, _>>()?;
+    let kiriman: Vec<(i64, i64, bool)> = q
+        .query_map(params![barang_id, hari_ini], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+        .map(|baris| {
+            baris.map(|(id, sisa, basi): (i64, i64, bool)| {
+                let dipakai: i64 = terpakai.iter().filter(|a| a.kiriman_id == id).map(|a| a.jumlah.max(0)).sum();
+                (id, (sisa - dipakai).max(0), basi)
+            })
+        })
+        .collect::<Result<_, _>>()?;
     let (mut usul, mut kurang, mut tersedia, mut basi) = (Vec::new(), jumlah, 0, 0);
     for (id, sisa, kedaluwarsa) in kiriman {
+        if sisa == 0 {
+            continue;
+        }
         if kedaluwarsa {
             basi += sisa;
             continue;
@@ -333,11 +366,13 @@ pub fn keluar(conn: &Connection, s: &Sesi, m: KeluarMasukan, hari_ini: &str) -> 
         if baris.alokasi.is_empty() {
             return Err(Galat::validasi(format!("Jumlah {nama} belum diisi.")));
         }
+        periksa_batas(0, baris.harga_jual)?;
         let mut jumlah_baris = 0;
         for a in &baris.alokasi {
             if a.jumlah <= 0 {
                 return Err(Galat::validasi(format!("Jumlah {nama} harus lebih dari nol.")));
             }
+            periksa_batas(a.jumlah, 0)?;
             let k: Option<(i64, i64, bool, String, Option<String>)> = tx
                 .query_row("SELECT barang_id, sisa, batal, tanggal_masuk, kedaluwarsa FROM kiriman WHERE id=?1", [a.kiriman_id], |r| {
                     Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
@@ -578,6 +613,7 @@ pub fn perbaiki_kiriman(conn: &Connection, data: &Path, s: &Sesi, id: i64, mut p
     if p.harga_beli < 0 {
         return Err(Galat::validasi("Harga beli tidak boleh negatif."));
     }
+    periksa_batas(0, p.harga_beli)?;
     p.spek = rapikan(p.spek);
     p.kedaluwarsa = rapikan(p.kedaluwarsa);
     p.pemasok = rapikan(p.pemasok);
@@ -652,6 +688,7 @@ pub fn sesuaikan(conn: &Connection, s: &Sesi, kiriman_id: i64, tanggal: &str, se
     if selisih == 0 {
         return Err(Galat::validasi("Selisih penyesuaian tidak boleh nol."));
     }
+    periksa_batas(selisih, 0)?;
     if !ALASAN_PENYESUAIAN.contains(&alasan) {
         return Err(Galat::validasi("Pilih alasan penyesuaian: rusak, kedaluwarsa, hilang, pakai sendiri, atau koreksi hitung."));
     }

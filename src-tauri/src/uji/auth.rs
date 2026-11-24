@@ -324,3 +324,13 @@ fn pengaturan_dijaga() {
     crate::pengaturan::simpan(&c, &p, "nama_toko", "Toko Baru").unwrap();
     assert_eq!(crate::pengaturan::ambil(&c).unwrap().nama_toko, "Toko Baru");
 }
+
+#[test]
+fn nama_pengguna_tak_dikenal_tidak_ditulis_ke_log() {
+    let (c, _) = db_setup();
+    // Orang sering salah mengetik kata sandi di kolom nama pengguna.
+    let _ = login(&c, "sandiRahasiaKu9", "apa-saja-1", t0());
+    let isi: String = c.query_row("SELECT group_concat(ringkasan, '|') FROM log_aktivitas", [], |r| r.get(0)).unwrap();
+    assert!(!isi.contains("sandiRahasiaKu9"), "{isi}");
+    assert_eq!(hitung(&c, "SELECT count(*) FROM log_aktivitas WHERE tindakan='auth.gagal'"), 1);
+}

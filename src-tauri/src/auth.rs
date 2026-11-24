@@ -112,7 +112,8 @@ pub fn login(conn: &Connection, nama_pengguna: &str, sandi: &str, kini: DateTime
     let Some((id, hash_sandi, aktif, gagal, ditahan)) = baris else {
         // Tetap menghitung hash supaya lama respons tidak membocorkan ada/tidaknya akun.
         let _ = hash(sandi);
-        log::catat(conn, None, "auth.gagal", &format!("Percobaan masuk dengan nama pengguna tak dikenal '{nama_pengguna}'"))?;
+        // Nama yang diketik tidak dicatat: orang kerap salah mengetik kata sandi di kolom ini.
+        log::catat(conn, None, "auth.gagal", "Percobaan masuk dengan nama pengguna yang tidak dikenal")?;
         return Err(salah());
     };
     let kini_naif = kini.naive_local();

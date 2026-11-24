@@ -23,6 +23,9 @@ pub fn laporan_ekspor(st: State<AppState>, jenis: Jenis, dari: String, sampai: S
     dengan_sesi(&st, |c, s| {
         let l = laporan::buat(c, s, jenis, &dari, &sampai)?;
         let mut jalur = PathBuf::from(&tujuan);
+        if crate::jalur::di_dalam(&st.data, &jalur) {
+            return Err(Galat::validasi("Pilih lokasi di luar folder data aplikasi, misalnya folder Dokumen."));
+        }
         if !matches!(format.as_str(), "xlsx" | "pdf") {
             return Err(Galat::validasi("Format ekspor harus xlsx atau pdf."));
         }

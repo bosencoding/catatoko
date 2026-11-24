@@ -62,10 +62,19 @@ describe("bacaJumlah", () => {
     expect(bacaJumlah("10")).toBe(10000);
     expect(bacaJumlah("2,125")).toBe(2125);
   });
-  it("menerima titik desimal bila jelas bukan ribuan", () => {
+  it("satu titik tanpa koma selalu desimal (angka timbangan), tidak pernah ribuan", () => {
     expect(bacaJumlah("0.5")).toBe(500);
     expect(bacaJumlah("12.25")).toBe(12250);
-    expect(bacaJumlah("1.250")).toBe(1250000);
+    expect(bacaJumlah("0.500")).toBe(500);
+    expect(bacaJumlah("0.125")).toBe(125);
+    expect(bacaJumlah("1.250")).toBe(1250);
+    expect(bacaJumlah("12.5")).toBe(12500);
+  });
+  it("titik sebagai ribuan hanya bila tidak mungkin desimal", () => {
+    expect(bacaJumlah("1.250.000")).toBe(1250000000);
+    expect(bacaJumlah("1.250,5")).toBe(1250500);
+    expect(bacaJumlah("0.1234")).toBeNull();
+    expect(bacaJumlah("1.25.000")).toBeNull();
   });
   it("menolak nol, negatif, kosong, dan lebih dari 3 desimal", () => {
     for (const t of ["", "0", "0,0", "-1", "0,0005", "abc", "1,2,3", "1.2.3", ","]) {

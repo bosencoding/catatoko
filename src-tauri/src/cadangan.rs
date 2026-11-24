@@ -66,6 +66,13 @@ fn tulis_zip(conn: &Connection, data: &Path, tujuan: &Path) -> Hasil<()> {
 /// Membuat cadangan. Tanpa `tujuan`, disimpan di `data/cadangan/catat-YYYYMMDD-HHMMSS.zip`.
 pub fn cadangkan(conn: &Connection, data: &Path, s: &Sesi, tujuan: Option<&Path>) -> Hasil<PathBuf> {
     wajib_pemilik(s)?;
+    if let Some(t) = tujuan {
+        // Di dalam folder data hanya subfolder cadangan/ yang boleh ditulisi: jangan sampai
+        // dialog simpan menimpa catat.db atau foto.
+        if crate::jalur::di_dalam(data, t) && !crate::jalur::di_dalam(&data.join("cadangan"), t) {
+            return Err(Galat::validasi("Pilih lokasi lain. Di dalam folder data, cadangan hanya boleh disimpan di subfolder 'cadangan'."));
+        }
+    }
     let tujuan = tujuan.map(Path::to_path_buf).unwrap_or_else(|| nama_baru(&data.join("cadangan"), "catat"));
     tulis_zip(conn, data, &tujuan)?;
     log::catat(conn, Some(s.pengguna_id), "cadangan.buat", &format!("Cadangan dibuat: {}", tujuan.display()))?;
@@ -167,18 +174,20 @@ pub fn pulihkan(conn: &mut Connection, data: &Path, s: &Sesi, sumber: &Path) -> 
         let otomatis = nama_baru(&data.join("cadangan"), "catat-sebelum-pulih");
         tulis_zip(conn, data, &otomatis)?;
         tukar(conn, data, &sementara)?;
-        log::catat(
+        // Data sudah berganti; gagal menulis log tidak boleh membuat pemulihan dianggap gagal.
+        let _ = log::catat(
             conn,
             None,
             "cadangan.pulihkan",
             &format!("Data dipulihkan dari {} oleh {}. Data sebelumnya disimpan di {}", sumber.display(), s.nama, otomatis.display()),
-        )
+        );
+        Ok(())
     })();
     let _ = std::fs::remove_dir_all(&sementara);
     hasil
 }
 
-fn tukar(conn: &mut Connection, data: &Path, sementara: &Path) -> Hasil<()> {
+pub(crate) fn tukar(conn: &mut Connection, data: &Path, sementara: &Path) -> Hasil<()> {
     let (db_kini, db_lama) = (data.join("catat.db"), data.join("catat.db.lama"));
     let (foto_kini, foto_lama) = (data.join("foto"), data.join("foto.lama"));
     // Lepas file database yang sedang dipakai.
@@ -207,8 +216,41 @@ fn tukar(conn: &mut Connection, data: &Path, sementara: &Path) -> Hasil<()> {
                 let _ = std::fs::remove_dir_all(&foto_kini);
                 let _ = std::fs::rename(&foto_lama, &foto_kini);
             }
-            *conn = db::buka(&db_kini)?;
-            Err(Galat::internal(format!("pemulihan gagal dan data lama dikembalikan: {}", e.pesan)))
+            match db::buka(&db_kini) {
+                Ok(lama) => {
+                    *conn = lama;
+                    Err(Galat::internal(format!("pemulihan gagal dan data lama dikembalikan: {}", e.pesan)))
+                }
+                Err(e2) => Err(Galat::internal(format!(
+                    "pemulihan gagal ({}) dan data lama tidak bisa dibuka lagi ({}). Tutup aplikasi lalu buka kembali.",
+                    e.pesan, e2.pesan
+                ))),
+            }
         }
     }
+}
+
+/// Dipanggil saat aplikasi dibuka: mengembalikan keadaan bila pemulihan sebelumnya terputus di
+/// tengah penukaran (masih ada `*.lama`), dan membuang berkas sementara.
+pub fn bereskan_sisa(data: &Path) {
+    let (db_kini, db_lama) = (data.join("catat.db"), data.join("catat.db.lama"));
+    let (foto_kini, foto_lama) = (data.join("foto"), data.join("foto.lama"));
+    if db_lama.exists() {
+        let _ = std::fs::remove_file(&db_kini);
+        let _ = std::fs::rename(&db_lama, &db_kini);
+    }
+    if foto_lama.exists() {
+        let _ = std::fs::remove_dir_all(&foto_kini);
+        let _ = std::fs::rename(&foto_lama, &foto_kini);
+    }
+    let buang = |dir: &Path, awalan: &str| {
+        for entri in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+            if entri.file_name().to_string_lossy().starts_with(awalan) {
+                let p = entri.path();
+                let _ = if p.is_dir() { std::fs::remove_dir_all(&p) } else { std::fs::remove_file(&p) };
+            }
+        }
+    };
+    buang(data, ".pulih-");
+    buang(&data.join("cadangan"), ".tmp-");
 }

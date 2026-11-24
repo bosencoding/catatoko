@@ -122,6 +122,7 @@ fn periksa(conn: &Connection, m: &mut BarangMasukan, id: i64) -> Hasil<()> {
     if m.harga_jual < 0 || m.stok_minimum < 0 {
         return Err(Galat::validasi("Harga jual dan stok minimum tidak boleh negatif."));
     }
+    crate::stok::periksa_batas(m.stok_minimum, m.harga_jual)?;
     if let Some(k) = m.kategori_id {
         let ada: i64 = conn.query_row("SELECT count(*) FROM kategori_barang WHERE id=?1", [k], |r| r.get(0))?;
         if ada == 0 {

@@ -37,7 +37,8 @@ function hitung(p: Pilihan): Periode | null {
 function terapkan() {
   const p = hitung(pilihan.value);
   if (p) [dari.value, sampai.value] = [p.dari, p.sampai];
-  if (dari.value && sampai.value && dari.value <= sampai.value) emit("update:modelValue", { dari: dari.value, sampai: sampai.value });
+  const iso = /^\d{4}-\d{2}-\d{2}$/;
+  if (iso.test(dari.value) && iso.test(sampai.value) && dari.value <= sampai.value) emit("update:modelValue", { dari: dari.value, sampai: sampai.value });
 }
 watch(pilihan, terapkan);
 watch([dari, sampai], () => pilihan.value === "bebas" && terapkan());

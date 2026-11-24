@@ -248,3 +248,33 @@ fn terbaru_menurut_urutan_pencatatan() {
     assert_eq!(stok::keluar_terbaru(&s.c, &kasir(), 10).unwrap()[0].laba, None);
     assert_eq!(stok::keluar_terbaru(&s.c, &staf(&[(Modul::Kas, Tingkat::Ubah)], true), 10).unwrap_err().kode, "TIDAK_BERHAK");
 }
+
+#[test]
+fn usul_memperhitungkan_yang_sudah_dipakai_baris_lain() {
+    let s = skenario();
+    // Baris pertama sudah mengambil 2 karung dari Sep; baris kedua (harga lain) minta 2 lagi.
+    let terpakai = [Alokasi { kiriman_id: s.sep, jumlah: 2_000 }];
+    let u = stok::usul_alokasi_sisa(&s.c, &pemilik(), s.barang, 2_000, HARI_INI, &terpakai).unwrap();
+    assert_eq!(pasangan(&u), vec![(s.okt, 2_000)]);
+    let sebagian = [Alokasi { kiriman_id: s.sep, jumlah: 500 }];
+    let u = stok::usul_alokasi_sisa(&s.c, &pemilik(), s.barang, 2_000, HARI_INI, &sebagian).unwrap();
+    assert_eq!(pasangan(&u), vec![(s.sep, 1_500), (s.okt, 500)]);
+    let e = stok::usul_alokasi_sisa(&s.c, &pemilik(), s.barang, 31_000, HARI_INI, &terpakai).unwrap_err();
+    assert_eq!(e.kode, "STOK_KURANG");
+    assert!(e.pesan.contains("tersedia 30"), "{}", e.pesan);
+    // hasil kedua baris bisa disimpan bersama
+    let mut m = jual(s.barang, 450_000, &[(s.sep, 2_000)]);
+    m.baris.push(stok::BarisKeluarMasukan { barang_id: s.barang, harga_jual: 400_000, alokasi: vec![Alokasi { kiriman_id: s.okt, jumlah: 2_000 }] });
+    stok::keluar(&s.c, &pemilik(), m, HARI_INI).unwrap();
+    assert_eq!((sisa(&s.c, s.sep), sisa(&s.c, s.okt)), (0, 8_000));
+}
+
+#[test]
+fn nilai_tidak_meluap() {
+    let s = skenario();
+    let mut m = masukan_masuk(s.barang, "2026-11-21", i64::MAX / 2, i64::MAX / 2);
+    m.stok_awal = true;
+    assert_eq!(stok::masuk(&s.c, s.d.path(), &pemilik(), m).unwrap_err().kode, "VALIDASI");
+    assert_eq!(stok::keluar(&s.c, &pemilik(), jual(s.barang, i64::MAX / 2, &[(s.nov, 20_000)]), HARI_INI).unwrap_err().kode, "VALIDASI");
+    assert_eq!(sisa(&s.c, s.nov), 20_000);
+}

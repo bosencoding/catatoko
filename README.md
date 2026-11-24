@@ -32,6 +32,8 @@ Catat/
 Untuk pindah komputer atau flashdisk, salin seluruh folder `Catat`. Kalau folder itu
 tidak bisa ditulis, aplikasi menampilkan pesan dan tidak menyimpan data di tempat lain.
 
+Satu folder data hanya bisa dibuka satu jendela Catat pada satu waktu; jendela kedua menampilkan pesan.
+
 Di luar folder itu, WebKit menyimpan cache dan pilihan mode terang/gelap di
 `~/.local/share/id.catat.app` dan `~/.cache/id.catat.app`. Tidak ada catatan toko di sana.
 

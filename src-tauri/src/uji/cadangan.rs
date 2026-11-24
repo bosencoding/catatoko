@@ -181,3 +181,54 @@ fn staf_tak_bisa() {
     let zip = cadangan::cadangkan(&c, d.path(), &pemilik(), None).unwrap();
     assert_eq!(cadangan::pulihkan(&mut c, d.path(), &kasir(), &zip).unwrap_err().kode, "TIDAK_BERHAK");
 }
+
+#[test]
+fn cadangan_tidak_boleh_menimpa_data() {
+    let (c, d) = toko();
+    let sebelum = potret(d.path());
+    for jahat in ["catat.db", "foto/x.zip", "apa.zip"] {
+        let e = cadangan::cadangkan(&c, d.path(), &pemilik(), Some(&d.path().join(jahat))).unwrap_err();
+        assert_eq!(e.kode, "VALIDASI", "{jahat}");
+    }
+    assert_eq!(potret(d.path()), sebelum);
+    assert!(cadangan::cadangkan(&c, d.path(), &pemilik(), Some(&d.path().join("cadangan/manual.zip"))).is_ok());
+    assert!(crate::jalur::di_dalam(d.path(), &d.path().join("foto/../catat.db")));
+    assert!(!crate::jalur::di_dalam(d.path(), &d.path().parent().unwrap().join("laporan.pdf")));
+}
+
+#[test]
+fn tukar_gagal_mengembalikan_data_lama() {
+    let (mut c, d) = toko();
+    // Folder sementara tanpa foto/: langkah terakhir penukaran gagal.
+    let sementara = d.path().join(".pulih-uji");
+    std::fs::create_dir_all(&sementara).unwrap();
+    let luar = tempfile::tempdir().unwrap();
+    std::fs::copy(db_sah(luar.path(), true), sementara.join("catat.db")).unwrap();
+    assert!(cadangan::tukar(&mut c, d.path(), &sementara).is_err());
+    assert_eq!(nama_barang(&c), vec!["Barang A"], "koneksi kembali ke data lama");
+    assert!(d.path().join("foto").is_dir() && !d.path().join("foto.lama").exists() && !d.path().join("catat.db.lama").exists());
+    barang::tambah(&c, d.path(), &pemilik(), uji_barang::masukan("Barang D")).unwrap();
+}
+
+#[test]
+fn sisa_pemulihan_yang_terputus_dibereskan_saat_mulai() {
+    let (c, d) = toko();
+    drop(c);
+    let p = d.path();
+    // Keadaan setelah mati listrik di tengah penukaran: data lama sudah diganti nama, yang baru setengah jadi.
+    std::fs::rename(p.join("catat.db"), p.join("catat.db.lama")).unwrap();
+    std::fs::rename(p.join("foto"), p.join("foto.lama")).unwrap();
+    std::fs::write(p.join("catat.db"), b"setengah jadi").unwrap();
+    std::fs::create_dir_all(p.join(".pulih-abc/foto")).unwrap();
+    std::fs::write(p.join("cadangan/.tmp-1.db"), b"x").unwrap();
+    cadangan::bereskan_sisa(p);
+    let c = db::buka(&p.join("catat.db")).unwrap();
+    assert_eq!(nama_barang(&c), vec!["Barang A"]);
+    assert_eq!(std::fs::read_dir(p.join("foto")).unwrap().count(), 2);
+    for sisa in ["catat.db.lama", "foto.lama", ".pulih-abc", "cadangan/.tmp-1.db"] {
+        assert!(!p.join(sisa).exists(), "{sisa}");
+    }
+    // tanpa sisa: tidak mengubah apa pun
+    cadangan::bereskan_sisa(p);
+    assert_eq!(nama_barang(&c), vec!["Barang A"]);
+}

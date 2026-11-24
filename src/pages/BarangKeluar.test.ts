@@ -66,7 +66,7 @@ describe("BarangKeluar", () => {
   it("mengusulkan kiriman terlama dan menampilkan rinciannya", async () => {
     const w = await buka();
     await pilihPakanTigaKarung(w);
-    expect(panggil).toHaveBeenCalledWith("usul_alokasi", { barang_id: 1, jumlah: 3000 });
+    expect(panggil).toHaveBeenCalledWith("usul_alokasi", { barang_id: 1, jumlah: 3000, terpakai: [] });
     const rinci = w.get('[data-uji="alokasi-0"]').text();
     expect(rinci).toContain("2 dari 03 Sep");
     expect(rinci).toContain("1 dari 15 Okt");
@@ -115,5 +115,29 @@ describe("BarangKeluar", () => {
     tunda[0]([{ kiriman_id: 11, jumlah: 2000 }, { kiriman_id: 12, jumlah: 1000 }]);
     await flushPromises();
     expect(w.get('[data-uji="alokasi-0"]').text()).toBe("1 dari 03 Sep");
+  });
+
+  it("simpan ditahan selama usul untuk jumlah terbaru belum kembali", async () => {
+    const w = await buka();
+    await pilihPakanTigaKarung(w);
+    usul = () => new Promise(() => {});
+    await w.get('[data-uji="jumlah-0"]').setValue("5");
+    await flushPromises();
+    expect(w.get('[data-uji="simpan"]').attributes("disabled")).toBeDefined();
+  });
+
+  it("baris kedua untuk barang yang sama tidak berebut kiriman dengan baris pertama", async () => {
+    const w = await buka();
+    await pilihPakanTigaKarung(w);
+    await w.get('[data-uji="tambah-baris"]').trigger("click");
+    await w.get('[data-uji="pilih-barang-1"]').trigger("focus");
+    await w.findAll('[data-uji="opsi-barang-1"]').at(-1)!.trigger("mousedown");
+    await flushPromises();
+    usul = () => Promise.resolve([{ kiriman_id: 12, jumlah: 2000 }]);
+    await w.get('[data-uji="jumlah-1"]').setValue("2");
+    await flushPromises();
+    const terakhir = panggil.mock.calls.filter((c) => c[0] === "usul_alokasi").at(-1)!;
+    expect(terakhir[1]).toEqual({ barang_id: 1, jumlah: 2000, terpakai: [{ kiriman_id: 11, jumlah: 2000 }, { kiriman_id: 12, jumlah: 1000 }] });
+    expect(w.get('[data-uji="alokasi-1"]').text()).toBe("2 dari 15 Okt");
   });
 });

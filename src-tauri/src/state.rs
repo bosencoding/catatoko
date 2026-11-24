@@ -17,6 +17,8 @@ pub struct AppState {
 /// dalam keadaan itu `AppState` tidak tersedia dan hanya `status_awal` yang boleh dipanggil.
 pub struct Mulai {
     pub galat: Option<String>,
+    /// Kunci satu-jendela pada folder data; dipegang selama aplikasi hidup.
+    pub kunci_data: Option<std::fs::File>,
 }
 
 impl AppState {

@@ -61,22 +61,25 @@ export function bacaRupiah(teks: string): number | null {
 
 /**
  * Membaca jumlah barang menjadi seperseribu satuan. Harus lebih dari nol, maksimal 3 desimal.
- * Ada koma: titik = ribuan, koma = desimal. Tanpa koma dan tepat satu titik diikuti
- * 1–2 digit: titik = desimal. Selain itu titik = ribuan.
+ * - Ada koma: koma = desimal, titik = pemisah ribuan ("1.250,75").
+ * - Tanpa koma dengan SATU titik: titik = desimal ("0.5", "0.500", "1.250" = 1,25), seperti
+ *   angka pada timbangan. Tidak pernah dibaca sebagai ribuan, supaya 0.500 kg tidak menjadi 500 kg.
+ * - Tanpa koma dengan dua titik atau lebih: titik = pemisah ribuan ("1.250.000").
  */
 export function bacaJumlah(teks: string): number | null {
   const t = teks.trim();
+  const RIBUAN = /^(\d{1,3}(\.\d{3})+|\d+)$/;
   let utuh: string;
   let pecahan = "";
   if (t.includes(",")) {
     const bagian = t.split(",");
     if (bagian.length !== 2) return null;
     [utuh, pecahan] = bagian;
-    if (!/^(\d{1,3}(\.\d{3})+|\d+)$/.test(utuh) || !/^\d{1,3}$/.test(pecahan)) return null;
+    if (!RIBUAN.test(utuh) || !/^\d{1,3}$/.test(pecahan)) return null;
     utuh = utuh.replace(/\./g, "");
-  } else if (/^\d+\.\d{1,2}$/.test(t)) {
+  } else if (/^\d+\.\d{1,3}$/.test(t)) {
     [utuh, pecahan] = t.split(".");
-  } else if (/^(\d{1,3}(\.\d{3})+|\d+)$/.test(t)) {
+  } else if (RIBUAN.test(t)) {
     utuh = t.replace(/\./g, "");
   } else {
     return null;

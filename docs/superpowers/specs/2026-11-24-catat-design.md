@@ -1,7 +1,7 @@
 # Catat — Desain Aplikasi Pencatatan Kas dan Stok
 
 Tanggal: 2026-11-24
-Status: target Linux dikonfirmasi pemilik; dilanjutkan ke rencana kerja
+Status: versi pertama (Linux) selesai dibangun di cabang `versi-1`
 
 Tanda **[keputusan pemilik]** berarti diputuskan oleh pemilik dalam diskusi.
 Tanda **[usulan]** berarti diisi oleh perancang dan boleh dikoreksi.

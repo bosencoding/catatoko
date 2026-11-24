@@ -31,6 +31,8 @@ interface Baris {
   kiriman: Kiriman[];
   /** Nomor permintaan usul terakhir; jawaban yang lebih lama diabaikan. */
   urut: number;
+  /** Usul untuk isian terbaru belum kembali. */
+  menunggu: boolean;
 }
 
 const sesi = useSesi();
@@ -41,7 +43,7 @@ const barang = ref<Barang[]>([]);
 const akun = ref<AkunKas[]>([]);
 const riwayat = ref<TransaksiKeluar[]>([]);
 let kunciBerikut = 1;
-const barisBaru = (): Baris => ({ kunci: kunciBerikut++, barang_id: null, jumlah: null, harga: null, alokasi: [], manual: false, kedaluwarsa: false, galat: "", kiriman: [], urut: 0 });
+const barisBaru = (): Baris => ({ kunci: kunciBerikut++, barang_id: null, jumlah: null, harga: null, alokasi: [], manual: false, kedaluwarsa: false, galat: "", kiriman: [], urut: 0, menunggu: false });
 const baris = ref<Baris[]>([barisBaru()]);
 const kepala = reactive({ tanggal: hariIni(), akun_kas_id: null as number | null, catatan: "" });
 const sibuk = ref(false);
@@ -58,7 +60,7 @@ const bisaSimpan = computed(
     bolehTambah.value &&
     !sibuk.value &&
     terisi.value.length > 0 &&
-    terisi.value.every((b) => b.alokasi.length > 0 && b.harga !== null && !b.galat) &&
+    terisi.value.every((b) => !b.menunggu && b.alokasi.length > 0 && b.alokasi.reduce((n, a) => n + a.jumlah, 0) === b.jumlah && b.harga !== null && !b.galat) &&
     kepala.akun_kas_id !== null &&
     kepala.tanggal !== "",
 );
@@ -82,6 +84,20 @@ async function muat() {
   if (!akun.value.some((a) => a.id === kepala.akun_kas_id)) kepala.akun_kas_id = akun.value[0]?.id ?? null;
 }
 
+/** Yang sudah diambil baris lain untuk barang yang sama: baris di atasnya, dan yang dipilih sendiri. */
+function terpakaiOleh(b: Baris): Alokasi[] {
+  const i = baris.value.indexOf(b);
+  return baris.value.filter((x, j) => x !== b && x.barang_id === b.barang_id && (j < i || x.manual)).flatMap((x) => x.alokasi);
+}
+
+/** Baris otomatis di bawah `b` untuk barang yang sama perlu dihitung ulang bila `b` berubah. */
+function hitungUlangDiBawah(b: Baris, barangId: number | null) {
+  if (barangId === null) return;
+  const i = baris.value.indexOf(b);
+  const berikut = baris.value.find((x, j) => (i < 0 || j > i) && x !== b && !x.manual && x.barang_id === barangId && x.jumlah !== null);
+  if (berikut) void usul(berikut);
+}
+
 async function usul(b: Baris) {
   b.manual = false;
   b.kedaluwarsa = false;
@@ -89,10 +105,13 @@ async function usul(b: Baris) {
   if (b.barang_id === null || b.jumlah === null) {
     b.alokasi = [];
     b.galat = "";
+    b.menunggu = false;
+    hitungUlangDiBawah(b, b.barang_id);
     return;
   }
+  b.menunggu = true;
   try {
-    const hasil = await panggil<Alokasi[]>("usul_alokasi", { barang_id: b.barang_id, jumlah: b.jumlah });
+    const hasil = await panggil<Alokasi[]>("usul_alokasi", { barang_id: b.barang_id, jumlah: b.jumlah, terpakai: terpakaiOleh(b) });
     if (urut !== b.urut) return;
     b.alokasi = hasil;
     b.galat = "";
@@ -101,10 +120,15 @@ async function usul(b: Baris) {
     b.alokasi = [];
     b.galat = pesanGalat(e);
   }
+  b.menunggu = false;
+  hitungUlangDiBawah(b, b.barang_id);
 }
 
 async function pilihBarang(b: Baris, id: number | null) {
+  const sebelumnya = b.barang_id;
   b.barang_id = id;
+  b.alokasi = [];
+  if (sebelumnya !== id) hitungUlangDiBawah(b, sebelumnya);
   b.kiriman = [];
   b.harga = namaBarang(id)?.harga_jual ?? null;
   if (id !== null) {
@@ -132,11 +156,16 @@ function pakaiKiriman(alokasi: Alokasi[], adaKedaluwarsa: boolean) {
   b.manual = true;
   b.kedaluwarsa = adaKedaluwarsa;
   b.galat = "";
+  b.menunggu = false;
+  hitungUlangDiBawah(b, b.barang_id);
 }
 
 function hapus(b: Baris) {
   baris.value = baris.value.filter((x) => x !== b);
   if (!baris.value.length) baris.value = [barisBaru()];
+  // Yang tadinya di bawah baris ini bisa mengambil lagi kiriman yang dilepas.
+  const pertama = baris.value.find((x) => !x.manual && x.barang_id === b.barang_id && x.jumlah !== null);
+  if (pertama && b.barang_id !== null) void usul(pertama);
 }
 
 async function simpan() {

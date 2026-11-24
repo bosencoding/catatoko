@@ -21,8 +21,8 @@ pub fn kiriman_barang(st: State<AppState>, barang_id: i64, hanya_bersisa: bool) 
 }
 
 #[tauri::command(rename_all = "snake_case")]
-pub fn usul_alokasi(st: State<AppState>, barang_id: i64, jumlah: i64) -> Hasil<Vec<stok::Alokasi>> {
-    dengan_sesi(&st, |c, s| stok::usul_alokasi(c, s, barang_id, jumlah, &waktu::hari_ini()))
+pub fn usul_alokasi(st: State<AppState>, barang_id: i64, jumlah: i64, terpakai: Option<Vec<stok::Alokasi>>) -> Hasil<Vec<stok::Alokasi>> {
+    dengan_sesi(&st, |c, s| stok::usul_alokasi_sisa(c, s, barang_id, jumlah, &waktu::hari_ini(), terpakai.as_deref().unwrap_or(&[])))
 }
 
 #[tauri::command(rename_all = "snake_case")]

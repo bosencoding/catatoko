@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 pub const KAT_PENJUALAN: &str = "Penjualan";
 pub const KAT_PEMBELIAN: &str = "Pembelian barang";
 pub const KAT_PINDAH: &str = "Pindah akun";
+/// Batas satu catatan kas (Rp 1 kuadriliun) agar penjumlahan saldo tidak pernah meluap.
+const UANG_MAKS: i64 = 1_000_000_000_000_000;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct KasMasukan {
@@ -182,6 +184,9 @@ fn periksa(conn: &Connection, m: &KasMasukan) -> Hasil<()> {
     if m.jumlah <= 0 {
         return Err(Galat::validasi("Jumlah uang harus lebih dari nol."));
     }
+    if m.jumlah > UANG_MAKS {
+        return Err(Galat::validasi("Jumlah uang terlalu besar."));
+    }
     akun_aktif(conn, m.akun_kas_id)?;
     let bawaan: Option<bool> = conn.query_row("SELECT bawaan FROM kategori_kas WHERE id=?1", [m.kategori_id], |r| r.get(0)).optional()?;
     match bawaan {
@@ -279,8 +284,8 @@ pub fn pindah(conn: &Connection, s: &Sesi, tanggal: &str, dari_akun: i64, ke_aku
     if dari_akun == ke_akun {
         return Err(Galat::validasi("Akun asal dan akun tujuan harus berbeda."));
     }
-    if jumlah <= 0 {
-        return Err(Galat::validasi("Jumlah uang harus lebih dari nol."));
+    if jumlah <= 0 || jumlah > UANG_MAKS {
+        return Err(Galat::validasi("Jumlah uang harus lebih dari nol dan tidak berlebihan."));
     }
     let nama_asal = akun_aktif(conn, dari_akun)?;
     let nama_tujuan = akun_aktif(conn, ke_akun)?;

@@ -24,10 +24,13 @@ pub mod waktu;
 
 use tauri::Manager;
 
-fn siapkan_state() -> galat::Hasil<state::AppState> {
+fn siapkan_state() -> galat::Hasil<(state::AppState, std::fs::File)> {
     let data = jalur::folder_data()?;
+    let kunci = jalur::kunci_tunggal(&data)?;
+    // Setelah kunci dipegang: bereskan sisa pemulihan yang terputus (mis. mati listrik).
+    cadangan::bereskan_sisa(&data);
     let conn = db::buka(&data.join("catat.db"))?;
-    Ok(state::AppState::baru(conn, data))
+    Ok((state::AppState::baru(conn, data), kunci))
 }
 
 /// Daftar perintah Tauri. Tambahan (hanya untuk build debug) bisa diselipkan lewat argumen.
@@ -115,15 +118,17 @@ pub fn run() {
             // Gagal menyiapkan folder data bukan alasan untuk mati diam-diam:
             // jendela tetap dibuka dan tampilan menampilkan pesannya.
             match siapkan_state() {
-                Ok(st) => {
+                Ok((st, kunci)) => {
                     // Tampilan hanya boleh membaca file di dalam data/foto.
-                    let _ = app.asset_protocol_scope().allow_directory(st.data.join("foto"), true);
+                    if let Err(e) = app.asset_protocol_scope().allow_directory(st.data.join("foto"), true) {
+                        eprintln!("foto tidak akan tampil: {e}");
+                    }
                     app.manage(st);
-                    app.manage(state::Mulai { galat: None });
+                    app.manage(state::Mulai { galat: None, kunci_data: Some(kunci) });
                 }
                 Err(e) => {
                     eprintln!("{}", e.pesan);
-                    app.manage(state::Mulai { galat: Some(e.pesan) });
+                    app.manage(state::Mulai { galat: Some(e.pesan), kunci_data: None });
                 }
             }
             Ok(())

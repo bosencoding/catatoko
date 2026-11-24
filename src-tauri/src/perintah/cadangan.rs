@@ -16,7 +16,10 @@ pub fn cadangan_buat(st: State<AppState>, tujuan: Option<String>) -> Hasil<Strin
 /// Setelah berhasil, sesi dihapus: pengguna masuk lagi dengan akun dari data yang dipulihkan.
 #[tauri::command(rename_all = "snake_case")]
 pub fn cadangan_pulihkan(st: State<AppState>, sumber: String) -> Hasil<()> {
-    dengan_sesi(&st, |c, s| cadangan::pulihkan(c, &st.data, s, &PathBuf::from(sumber)))?;
-    *kunci(&st.sesi) = None;
-    Ok(())
+    let hasil = dengan_sesi(&st, |c, s| cadangan::pulihkan(c, &st.data, s, &PathBuf::from(sumber)));
+    // Berhasil, atau gagal setelah data mulai ditukar: sesi lama tidak boleh dipakai terus.
+    if hasil.as_ref().map_or_else(|e| e.kode == "INTERNAL", |_| true) {
+        *kunci(&st.sesi) = None;
+    }
+    hasil
 }

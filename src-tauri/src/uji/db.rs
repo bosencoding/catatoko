@@ -106,3 +106,24 @@ fn folder_ada_tapi_terkunci() {
     std::fs::set_permissions(&data, std::fs::Permissions::from_mode(0o755)).unwrap();
     assert_eq!(e.kode, "FOLDER_DATA");
 }
+
+#[test]
+fn folder_data_hanya_dari_override_atau_lokasi_program() {
+    use crate::jalur::pilih_folder;
+    use std::path::{Path, PathBuf};
+    assert_eq!(pilih_folder(None, Path::new("/media/usb/Catat/catat")), Some(PathBuf::from("/media/usb/Catat/data")));
+    assert_eq!(pilih_folder(Some("/x/dev".into()), Path::new("/media/usb/Catat/catat")), Some(PathBuf::from("/x/dev")));
+    assert_eq!(pilih_folder(None, Path::new("/")), None);
+}
+
+#[test]
+fn hanya_satu_jendela_boleh_memegang_data() {
+    let d = tempfile::tempdir().unwrap();
+    siapkan(d.path()).unwrap();
+    let pertama = crate::jalur::kunci_tunggal(d.path()).unwrap();
+    let e = crate::jalur::kunci_tunggal(d.path()).unwrap_err();
+    assert_eq!(e.kode, "SUDAH_TERBUKA");
+    assert!(e.pesan.contains("sudah terbuka"), "{}", e.pesan);
+    drop(pertama);
+    assert!(crate::jalur::kunci_tunggal(d.path()).is_ok(), "kunci lepas saat jendela pertama ditutup");
+}
