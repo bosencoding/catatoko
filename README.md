@@ -12,6 +12,8 @@ spek dan harga berbeda dan stok lama harus habis lebih dulu.
 - Foto barang dan kiriman.
 - Semua data di SQLite, di folder `data/` di sebelah program. Tanpa internet.
 
+Panduan untuk pengguna: `docs/Panduan-Pengguna-Catat.pdf` (dibuat oleh `docs/panduan/buat_panduan.py`, butuh `reportlab` dan `pillow`).
+
 Rancangan lengkap: `docs/superpowers/specs/2026-11-24-catat-design.md`.
 
 ## Memakai (Linux)
