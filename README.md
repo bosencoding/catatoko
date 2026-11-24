@@ -37,6 +37,16 @@ Satu folder data hanya bisa dibuka satu jendela Catat pada satu waktu; jendela k
 Di luar folder itu, WebKit menyimpan cache dan pilihan mode terang/gelap di
 `~/.local/share/id.catat.app` dan `~/.cache/id.catat.app`. Tidak ada catatan toko di sana.
 
+## Memakai (Windows)
+
+Ekstrak `Catat-windows-x86_64.zip`, lalu jalankan `catat.exe` di dalam folder `Catat`
+(`WebView2Loader.dll` harus tetap di sebelahnya). Butuh Windows 10/11 64-bit dengan
+WebView2 Runtime. Data berada di `Catat\data\`, sama seperti di Linux. WebView2 menyimpan
+cache di `%LOCALAPPDATA%\id.catat.app`; tidak ada catatan toko di sana.
+
+Versi Windows dibangun dengan kompilasi silang dari Linux dan **belum pernah dijalankan
+di Windows**; lihat bagian "Belum ada".
+
 ## Membangun
 
 Prasyarat: Rust (rustup), Node 22+, pnpm, dan pustaka pengembangan WebKitGTK 4.1.
@@ -44,7 +54,8 @@ Prasyarat: Rust (rustup), Node 22+, pnpm, dan pustaka pengembangan WebKitGTK 4.1
 ```sh
 pnpm install
 pnpm tauri dev                 # mode pengembangan
-scripts/paket-linux.sh         # paket portabel di dist-portable/
+scripts/paket-linux.sh         # paket portabel Linux di dist-portable/
+scripts/paket-windows.sh       # paket portabel Windows (butuh mingw-w64, lihat isi skrip)
 ```
 
 Saat pengembangan, `CATAT_DATA_DIR=/suatu/folder` memindahkan folder data.
@@ -79,5 +90,6 @@ Skenario 02 dan 03 memakai tanggal contoh di tahun 2026. Alat bantu uji
 
 ## Belum ada
 
-Windows belum dibangun dan belum diuji. Di luar versi ini: hutang/piutang, konversi satuan,
+Versi Windows sudah dibangun tetapi belum diuji di Windows sungguhan: uji otomatis dan uji
+antarmuka hanya dijalankan di Linux. Di luar versi ini: hutang/piutang, konversi satuan,
 cetak struk, barcode, banyak toko, enkripsi file database.

@@ -1,5 +1,6 @@
 use crate::db::{buka, buka_memori, migrasi};
 use crate::jalur::siapkan;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
 const TABEL: [&str; 13] = [
@@ -85,6 +86,7 @@ fn siapkan_membuat_subfolder() {
     assert!(data.join("cadangan").is_dir());
 }
 
+#[cfg(unix)]
 #[test]
 fn folder_tak_bisa_ditulis() {
     let d = tempfile::tempdir().unwrap();
@@ -96,6 +98,7 @@ fn folder_tak_bisa_ditulis() {
     assert!(e.pesan.contains(&data.display().to_string()), "{}", e.pesan);
 }
 
+#[cfg(unix)]
 #[test]
 fn folder_ada_tapi_terkunci() {
     let d = tempfile::tempdir().unwrap();
@@ -113,7 +116,7 @@ fn folder_data_hanya_dari_override_atau_lokasi_program() {
     use std::path::{Path, PathBuf};
     assert_eq!(pilih_folder(None, Path::new("/media/usb/Catat/catat")), Some(PathBuf::from("/media/usb/Catat/data")));
     assert_eq!(pilih_folder(Some("/x/dev".into()), Path::new("/media/usb/Catat/catat")), Some(PathBuf::from("/x/dev")));
-    assert_eq!(pilih_folder(None, Path::new("/")), None);
+    assert_eq!(pilih_folder(None, Path::new("")), None);
 }
 
 #[test]
