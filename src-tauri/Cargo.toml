@@ -38,3 +38,19 @@ lto = true
 opt-level = 3
 panic = "abort"
 strip = true
+
+# Kripto dan pengolah gambar terlalu lambat tanpa optimasi; percepat untuk dev/uji.
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3
+[profile.dev.package.image]
+opt-level = 3
+[profile.dev.package.zune-jpeg]
+opt-level = 3
+[profile.dev.package.png]
+opt-level = 3
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+[profile.dev.package.fdeflate]
+opt-level = 3
