@@ -4,6 +4,7 @@ use rusqlite::Connection;
 mod auth;
 mod barang;
 mod db;
+mod batal;
 mod kas;
 mod keluar;
 mod masuk;

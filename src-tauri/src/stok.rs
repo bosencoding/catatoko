@@ -430,3 +430,291 @@ pub fn daftar_keluar(conn: &Connection, s: &Sesi, dari: &str, sampai: &str) -> H
     }
     Ok(hasil)
 }
+
+// ---------------------------------------------------------------------------
+// Pembatalan, perbaikan kiriman, penyesuaian stok
+// ---------------------------------------------------------------------------
+
+const ALASAN_PENYESUAIAN: [&str; 5] = ["rusak", "kedaluwarsa", "hilang", "pakai_sendiri", "koreksi"];
+
+/// Membatalkan barang keluar: stok kembali ke kirimannya, kas penjualannya ikut batal.
+pub fn batal_keluar(conn: &Connection, s: &Sesi, id: i64, alasan: &str) -> Hasil<()> {
+    wajib(s, Modul::BarangKeluar, Tingkat::Ubah)?;
+    let alasan = kas::periksa_alasan(alasan)?;
+    let batal: bool = conn.query_row("SELECT batal FROM transaksi_keluar WHERE id=?1", [id], |r| r.get(0)).map_err(|_| Galat::tidak_ditemukan("Transaksi barang keluar"))?;
+    if batal {
+        return Err(Galat::validasi("Transaksi ini sudah dibatalkan."));
+    }
+    let tx = conn.unchecked_transaction()?;
+    tx.execute(
+        "UPDATE kiriman SET sisa = sisa + (SELECT SUM(jumlah) FROM baris_keluar WHERE transaksi_id=?1 AND kiriman_id=kiriman.id)
+         WHERE id IN (SELECT kiriman_id FROM baris_keluar WHERE transaksi_id=?1)",
+        [id],
+    )?;
+    tx.execute("UPDATE transaksi_keluar SET batal=1, alasan_batal=?1 WHERE id=?2", params![alasan, id])?;
+    kas::batal_otomatis(&tx, "transaksi_keluar", id)?;
+    log::catat(&tx, Some(s.pengguna_id), "keluar.batal", &format!("Barang keluar #{id} dibatalkan: {alasan}"))?;
+    tx.commit()?;
+    Ok(())
+}
+
+/// (batal, pernah_keluar, stok_awal, jumlah_awal, sisa, harga_beli, tanggal_masuk, akun_kas_id, foto, nama barang, satuan)
+struct KepalaKiriman {
+    batal: bool,
+    pernah_keluar: bool,
+    stok_awal: bool,
+    jumlah_awal: i64,
+    sisa: i64,
+    harga_beli: i64,
+    tanggal_masuk: String,
+    akun_kas_id: Option<i64>,
+    foto: Option<String>,
+    spek: Option<String>,
+    kedaluwarsa: Option<String>,
+    pemasok: Option<String>,
+    nama: String,
+    satuan: String,
+}
+
+fn kepala_kiriman(conn: &Connection, id: i64) -> Hasil<KepalaKiriman> {
+    conn.query_row(
+        "SELECT k.batal,
+           (EXISTS(SELECT 1 FROM baris_keluar bk JOIN transaksi_keluar t ON t.id=bk.transaksi_id WHERE bk.kiriman_id=k.id AND t.batal=0)
+            OR EXISTS(SELECT 1 FROM penyesuaian_stok p WHERE p.kiriman_id=k.id AND p.batal=0)),
+           k.stok_awal, k.jumlah_awal, k.sisa, k.harga_beli, k.tanggal_masuk, k.akun_kas_id, k.foto, k.spek, k.kedaluwarsa, k.pemasok, b.nama, b.satuan
+         FROM kiriman k JOIN barang b ON b.id=k.barang_id WHERE k.id=?1",
+        [id],
+        |r| {
+            Ok(KepalaKiriman {
+                batal: r.get(0)?,
+                pernah_keluar: r.get(1)?,
+                stok_awal: r.get(2)?,
+                jumlah_awal: r.get(3)?,
+                sisa: r.get(4)?,
+                harga_beli: r.get(5)?,
+                tanggal_masuk: r.get(6)?,
+                akun_kas_id: r.get(7)?,
+                foto: r.get(8)?,
+                spek: r.get(9)?,
+                kedaluwarsa: r.get(10)?,
+                pemasok: r.get(11)?,
+                nama: r.get(12)?,
+                satuan: r.get(13)?,
+            })
+        },
+    )
+    .map_err(|_| Galat::tidak_ditemukan("Kiriman"))
+}
+
+/// Membatalkan barang masuk. Hanya bila kirimannya belum pernah keluar atau disesuaikan.
+pub fn batal_masuk(conn: &Connection, s: &Sesi, kiriman_id: i64, alasan: &str) -> Hasil<()> {
+    wajib(s, Modul::BarangMasuk, Tingkat::Ubah)?;
+    let alasan = kas::periksa_alasan(alasan)?;
+    let k = kepala_kiriman(conn, kiriman_id)?;
+    if k.batal {
+        return Err(Galat::validasi("Barang masuk ini sudah dibatalkan."));
+    }
+    if k.pernah_keluar {
+        return Err(Galat::validasi(
+            "Kiriman ini sudah pernah keluar atau disesuaikan, jadi tidak bisa dibatalkan. Batalkan dulu transaksi keluarnya, atau gunakan 'Perbaiki kiriman' / 'Penyesuaian stok'.",
+        ));
+    }
+    let tx = conn.unchecked_transaction()?;
+    tx.execute("UPDATE kiriman SET batal=1, sisa=0, alasan_batal=?1 WHERE id=?2", params![alasan, kiriman_id])?;
+    kas::batal_otomatis(&tx, "kiriman", kiriman_id)?;
+    log::catat(
+        &tx,
+        Some(s.pengguna_id),
+        "masuk.batal",
+        &format!("Barang masuk #{kiriman_id} ({} {} {}) dibatalkan: {alasan}", teks_jumlah(k.jumlah_awal), k.satuan, k.nama),
+    )?;
+    tx.commit()?;
+    Ok(())
+}
+
+/// Nilai baru untuk kiriman. Semua field menggantikan nilai lama (kosong = dihapus), kecuali foto.
+#[derive(Debug, Clone, Deserialize)]
+pub struct PerbaikanKiriman {
+    pub harga_beli: i64,
+    pub spek: Option<String>,
+    pub kedaluwarsa: Option<String>,
+    pub pemasok: Option<String>,
+    pub foto_sumber: Option<PathBuf>,
+}
+
+fn beda(nama: &str, lama: &Option<String>, baru: &Option<String>, catatan: &mut Vec<String>) {
+    if lama != baru {
+        catatan.push(format!("{nama} {} → {}", lama.as_deref().unwrap_or("-"), baru.as_deref().unwrap_or("-")));
+    }
+}
+
+/// Memperbaiki kiriman tanpa mengubah jumlahnya. Kas pembelian mengikuti harga beli yang baru.
+pub fn perbaiki_kiriman(conn: &Connection, data: &Path, s: &Sesi, id: i64, mut p: PerbaikanKiriman) -> Hasil<()> {
+    wajib(s, Modul::BarangMasuk, Tingkat::Ubah)?;
+    crate::akses::wajib_harga_beli(s)?;
+    let k = kepala_kiriman(conn, id)?;
+    if k.batal {
+        return Err(Galat::validasi("Kiriman yang sudah dibatalkan tidak bisa diperbaiki."));
+    }
+    if p.harga_beli < 0 {
+        return Err(Galat::validasi("Harga beli tidak boleh negatif."));
+    }
+    p.spek = rapikan(p.spek);
+    p.kedaluwarsa = rapikan(p.kedaluwarsa);
+    p.pemasok = rapikan(p.pemasok);
+    periksa_kedaluwarsa(&p.kedaluwarsa, waktu::tanggal(&k.tanggal_masuk)?)?;
+    let foto_baru = p.foto_sumber.as_deref().map(|f| foto::simpan(data, f)).transpose()?;
+    let foto_akhir = foto_baru.clone().or(k.foto.clone());
+    let hasil = (|| {
+        let tx = conn.unchecked_transaction()?;
+        tx.execute(
+            "UPDATE kiriman SET harga_beli=?1, spek=?2, kedaluwarsa=?3, pemasok=?4, foto=?5 WHERE id=?6",
+            params![p.harga_beli, p.spek, p.kedaluwarsa, p.pemasok, foto_akhir, id],
+        )?;
+        let mut catatan = Vec::new();
+        if p.harga_beli != k.harga_beli {
+            catatan.push(format!("harga beli {} → {}", k.harga_beli, p.harga_beli));
+            if !k.stok_awal {
+                let total = nilai(k.jumlah_awal, p.harga_beli);
+                let ada = kas::sesuaikan_otomatis(&tx, "kiriman", id, total)?;
+                if let (false, true, Some(akun)) = (ada, total > 0, k.akun_kas_id) {
+                    let ket = format!("Beli {} {} {}", teks_jumlah(k.jumlah_awal), k.satuan, k.nama);
+                    kas::catat_otomatis(&tx, &k.tanggal_masuk, "keluar", akun, kas::KAT_PEMBELIAN, total, &ket, "kiriman", id, s.pengguna_id)?;
+                }
+            }
+        }
+        beda("spek", &k.spek, &p.spek, &mut catatan);
+        beda("kedaluwarsa", &k.kedaluwarsa, &p.kedaluwarsa, &mut catatan);
+        beda("pemasok", &k.pemasok, &p.pemasok, &mut catatan);
+        if foto_baru.is_some() {
+            catatan.push("foto diganti".into());
+        }
+        if catatan.is_empty() {
+            catatan.push("tanpa perubahan".into());
+        }
+        log::catat(&tx, Some(s.pengguna_id), "kiriman.perbaiki", &format!("Kiriman #{id} ({}) diperbaiki: {}", k.nama, catatan.join("; ")))?;
+        tx.commit()?;
+        Ok(())
+    })();
+    match (&hasil, &foto_baru) {
+        (Ok(()), Some(_)) => {
+            if let Some(l) = &k.foto {
+                foto::hapus(data, l);
+            }
+        }
+        (Err(_), Some(f)) => foto::hapus(data, f),
+        _ => {}
+    }
+    hasil
+}
+
+#[derive(Debug, Serialize)]
+pub struct Penyesuaian {
+    pub id: i64,
+    pub kiriman_id: i64,
+    pub barang_id: i64,
+    pub barang_nama: String,
+    pub satuan: String,
+    pub tanggal_masuk: String,
+    pub tanggal: String,
+    pub selisih: i64,
+    pub alasan: String,
+    pub catatan: Option<String>,
+    pub batal: bool,
+    /// Nilai selisih menurut harga beli. `None` tanpa hak harga beli.
+    pub nilai: Option<i64>,
+    pub dibuat_oleh_nama: Option<String>,
+}
+
+/// Menambah atau mengurangi sisa satu kiriman (rusak, hilang, pakai sendiri, koreksi hitung). Tidak memengaruhi kas.
+pub fn sesuaikan(conn: &Connection, s: &Sesi, kiriman_id: i64, tanggal: &str, selisih: i64, alasan: &str, catatan: Option<&str>) -> Hasil<i64> {
+    wajib(s, Modul::BarangMasuk, Tingkat::Ubah)?;
+    waktu::tanggal(tanggal)?;
+    if selisih == 0 {
+        return Err(Galat::validasi("Selisih penyesuaian tidak boleh nol."));
+    }
+    if !ALASAN_PENYESUAIAN.contains(&alasan) {
+        return Err(Galat::validasi("Pilih alasan penyesuaian: rusak, kedaluwarsa, hilang, pakai sendiri, atau koreksi hitung."));
+    }
+    let k = kepala_kiriman(conn, kiriman_id)?;
+    if k.batal {
+        return Err(Galat::validasi("Kiriman yang sudah dibatalkan tidak bisa disesuaikan."));
+    }
+    if k.sisa + selisih < 0 {
+        return Err(Galat::baru(
+            "STOK_KURANG",
+            format!("Sisa kiriman {} tanggal {} hanya {} {}, tidak bisa dikurangi {} {}.", k.nama, k.tanggal_masuk, teks_jumlah(k.sisa), k.satuan, teks_jumlah(-selisih), k.satuan),
+        ));
+    }
+    let tx = conn.unchecked_transaction()?;
+    tx.execute("UPDATE kiriman SET sisa=sisa+?1 WHERE id=?2", params![selisih, kiriman_id])?;
+    tx.execute(
+        "INSERT INTO penyesuaian_stok(kiriman_id,tanggal,selisih,alasan,catatan,dibuat_oleh,dibuat_pada) VALUES(?1,?2,?3,?4,?5,?6,?7)",
+        params![kiriman_id, tanggal, selisih, alasan, rapikan(catatan.map(str::to_string)), s.pengguna_id, waktu::kini()],
+    )?;
+    let id = tx.last_insert_rowid();
+    log::catat(
+        &tx,
+        Some(s.pengguna_id),
+        "stok.sesuaikan",
+        &format!("Penyesuaian #{id}: {} {} {} kiriman {} ({alasan})", teks_jumlah(selisih), k.satuan, k.nama, k.tanggal_masuk),
+    )?;
+    tx.commit()?;
+    Ok(id)
+}
+
+pub fn batal_penyesuaian(conn: &Connection, s: &Sesi, id: i64, alasan: &str) -> Hasil<()> {
+    wajib(s, Modul::BarangMasuk, Tingkat::Ubah)?;
+    let alasan = kas::periksa_alasan(alasan)?;
+    let (kiriman_id, selisih, batal): (i64, i64, bool) = conn
+        .query_row("SELECT kiriman_id, selisih, batal FROM penyesuaian_stok WHERE id=?1", [id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+        .map_err(|_| Galat::tidak_ditemukan("Penyesuaian stok"))?;
+    if batal {
+        return Err(Galat::validasi("Penyesuaian ini sudah dibatalkan."));
+    }
+    let k = kepala_kiriman(conn, kiriman_id)?;
+    if k.sisa - selisih < 0 {
+        return Err(Galat::baru(
+            "STOK_KURANG",
+            format!("Penyesuaian ini tidak bisa dibatalkan karena sebagian barangnya sudah keluar (sisa {} {}).", teks_jumlah(k.sisa), k.satuan),
+        ));
+    }
+    let tx = conn.unchecked_transaction()?;
+    tx.execute("UPDATE kiriman SET sisa=sisa-?1 WHERE id=?2", params![selisih, kiriman_id])?;
+    tx.execute("UPDATE penyesuaian_stok SET batal=1, alasan_batal=?1 WHERE id=?2", params![alasan, id])?;
+    log::catat(&tx, Some(s.pengguna_id), "stok.sesuaikan_batal", &format!("Penyesuaian #{id} ({}) dibatalkan: {alasan}", k.nama))?;
+    tx.commit()?;
+    Ok(())
+}
+
+pub fn daftar_penyesuaian(conn: &Connection, s: &Sesi, dari: &str, sampai: &str) -> Hasil<Vec<Penyesuaian>> {
+    wajib(s, Modul::BarangMasuk, Tingkat::Lihat)?;
+    waktu::rentang(dari, sampai)?;
+    let harga = s.boleh_harga_beli();
+    let mut q = conn.prepare(
+        "SELECT p.id, p.kiriman_id, b.id, b.nama, b.satuan, k.tanggal_masuk, p.tanggal, p.selisih, p.alasan, p.catatan, p.batal, k.harga_beli, u.nama
+         FROM penyesuaian_stok p JOIN kiriman k ON k.id=p.kiriman_id JOIN barang b ON b.id=k.barang_id LEFT JOIN pengguna u ON u.id=p.dibuat_oleh
+         WHERE p.tanggal BETWEEN ?1 AND ?2 ORDER BY p.tanggal DESC, p.id DESC",
+    )?;
+    let v = q
+        .query_map(params![dari, sampai], |r| {
+            let (selisih, harga_beli): (i64, i64) = (r.get(7)?, r.get(11)?);
+            Ok(Penyesuaian {
+                id: r.get(0)?,
+                kiriman_id: r.get(1)?,
+                barang_id: r.get(2)?,
+                barang_nama: r.get(3)?,
+                satuan: r.get(4)?,
+                tanggal_masuk: r.get(5)?,
+                tanggal: r.get(6)?,
+                selisih,
+                alasan: r.get(8)?,
+                catatan: r.get(9)?,
+                batal: r.get(10)?,
+                nilai: harga.then(|| selisih.signum() * nilai(selisih.abs(), harga_beli)),
+                dibuat_oleh_nama: r.get(12)?,
+            })
+        })?
+        .collect::<Result<_, _>>()?;
+    Ok(v)
+}

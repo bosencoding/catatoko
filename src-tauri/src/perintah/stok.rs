@@ -34,3 +34,33 @@ pub fn keluar_tambah(st: State<AppState>, masukan: stok::KeluarMasukan) -> Hasil
 pub fn keluar_daftar(st: State<AppState>, dari: String, sampai: String) -> Hasil<Vec<stok::TransaksiKeluar>> {
     dengan_sesi(&st, |c, s| stok::daftar_keluar(c, s, &dari, &sampai))
 }
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn keluar_batal(st: State<AppState>, id: i64, alasan: String) -> Hasil<()> {
+    dengan_sesi(&st, |c, s| stok::batal_keluar(c, s, id, &alasan))
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn masuk_batal(st: State<AppState>, kiriman_id: i64, alasan: String) -> Hasil<()> {
+    dengan_sesi(&st, |c, s| stok::batal_masuk(c, s, kiriman_id, &alasan))
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn kiriman_perbaiki(st: State<AppState>, id: i64, perbaikan: stok::PerbaikanKiriman) -> Hasil<()> {
+    dengan_sesi(&st, |c, s| stok::perbaiki_kiriman(c, &st.data, s, id, perbaikan))
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn stok_sesuaikan(st: State<AppState>, kiriman_id: i64, tanggal: String, selisih: i64, alasan: String, catatan: Option<String>) -> Hasil<i64> {
+    dengan_sesi(&st, |c, s| stok::sesuaikan(c, s, kiriman_id, &tanggal, selisih, &alasan, catatan.as_deref()))
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn penyesuaian_batal(st: State<AppState>, id: i64, alasan: String) -> Hasil<()> {
+    dengan_sesi(&st, |c, s| stok::batal_penyesuaian(c, s, id, &alasan))
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn penyesuaian_daftar(st: State<AppState>, dari: String, sampai: String) -> Hasil<Vec<stok::Penyesuaian>> {
+    dengan_sesi(&st, |c, s| stok::daftar_penyesuaian(c, s, &dari, &sampai))
+}
