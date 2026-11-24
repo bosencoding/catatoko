@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted } from "vue";
 import { RouterLink, RouterView, useRouter } from "vue-router";
 import {
   BanknoteIcon,
@@ -17,12 +17,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { panggil } from "@/lib/api";
 import { gantiTema, tema } from "@/lib/tema";
-import type { Pengaturan } from "@/lib/types";
+import { muatNamaToko, namaToko } from "@/lib/toko";
 import { useSesi } from "@/stores/sesi";
 
 const sesi = useSesi();
 const router = useRouter();
-const namaToko = ref("Catat");
 
 const menu = computed(() =>
   [
@@ -52,11 +51,7 @@ onMounted(async () => {
   window.addEventListener("keydown", aktivitas, true);
   // Kunci otomatis ditentukan Rust; di sini hanya memeriksa apakah sesi masih ada.
   berkala = setInterval(() => sesi.muat().catch(() => {}), 30_000);
-  try {
-    namaToko.value = (await panggil<Pengaturan>("pengaturan_ambil")).nama_toko || "Catat";
-  } catch {
-    // nama toko hanya hiasan
-  }
+  await muatNamaToko();
 });
 onBeforeUnmount(() => {
   window.removeEventListener("pointerdown", aktivitas, true);
