@@ -13,6 +13,12 @@ pub struct AppState {
     pub data: PathBuf,
 }
 
+/// Hasil penyiapan saat aplikasi dibuka. `galat` terisi bila folder data tidak bisa dipakai;
+/// dalam keadaan itu `AppState` tidak tersedia dan hanya `status_awal` yang boleh dipanggil.
+pub struct Mulai {
+    pub galat: Option<String>,
+}
+
 impl AppState {
     pub fn baru(conn: Connection, data: PathBuf) -> Self {
         AppState { db: Mutex::new(conn), sesi: Mutex::new(None), terakhir_aktif: Mutex::new(Instant::now()), data }

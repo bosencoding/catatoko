@@ -2,10 +2,16 @@ use super::{dengan_sesi, periksa_sesi};
 use crate::akses::Sesi;
 use crate::galat::Hasil;
 use crate::pengaturan::{self, Pengaturan};
-use crate::state::{kunci, AppState};
+use crate::state::{kunci, AppState, Mulai};
 use crate::{auth, log};
 use std::time::Instant;
 use tauri::State;
+
+/// Pesan galat penyiapan folder data, atau `None` bila aplikasi siap dipakai.
+#[tauri::command(rename_all = "snake_case")]
+pub fn status_awal(m: State<Mulai>) -> Option<String> {
+    m.galat.clone()
+}
 
 #[tauri::command(rename_all = "snake_case")]
 pub fn perlu_setup(st: State<AppState>) -> Hasil<bool> {

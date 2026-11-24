@@ -23,7 +23,6 @@ mod uji_ui;
 pub mod waktu;
 
 use tauri::Manager;
-use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 fn siapkan_state() -> galat::Hasil<state::AppState> {
     let data = jalur::folder_data()?;
@@ -35,6 +34,7 @@ fn siapkan_state() -> galat::Hasil<state::AppState> {
 macro_rules! daftar_perintah {
     ($($tambahan:path),*) => {
         tauri::generate_handler![
+            perintah::auth::status_awal,
             perintah::auth::perlu_setup,
             perintah::auth::setup_awal,
             perintah::auth::login,
@@ -112,16 +112,18 @@ pub fn run() {
             uji_ui::saat_halaman_dimuat(_webview, _muatan);
         })
         .setup(|app| {
+            // Gagal menyiapkan folder data bukan alasan untuk mati diam-diam:
+            // jendela tetap dibuka dan tampilan menampilkan pesannya.
             match siapkan_state() {
                 Ok(st) => {
                     // Tampilan hanya boleh membaca file di dalam data/foto.
                     let _ = app.asset_protocol_scope().allow_directory(st.data.join("foto"), true);
                     app.manage(st);
+                    app.manage(state::Mulai { galat: None });
                 }
                 Err(e) => {
-                    app.dialog().message(e.pesan.clone()).title("Catat tidak bisa dibuka").kind(MessageDialogKind::Error).blocking_show();
                     eprintln!("{}", e.pesan);
-                    std::process::exit(1);
+                    app.manage(state::Mulai { galat: Some(e.pesan) });
                 }
             }
             Ok(())

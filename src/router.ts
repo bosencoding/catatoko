@@ -1,3 +1,4 @@
+import { ref } from "vue";
 import { createRouter, createWebHashHistory, type RouteRecordRaw } from "vue-router";
 import { panggil } from "@/lib/api";
 import type { Modul } from "@/lib/types";
@@ -12,7 +13,11 @@ declare module "vue-router" {
   }
 }
 
+/** Pesan bila aplikasi tidak bisa menyiapkan folder datanya saat dibuka. */
+export const galatAwal = ref<string | null>(null);
+
 const routes: RouteRecordRaw[] = [
+  { path: "/galat", component: () => import("@/pages/GalatAwal.vue"), meta: { publik: true } },
   { path: "/setup", component: () => import("@/pages/Setup.vue"), meta: { publik: true } },
   { path: "/login", component: () => import("@/pages/Login.vue"), meta: { publik: true } },
   {
@@ -35,10 +40,17 @@ const routes: RouteRecordRaw[] = [
 export const router = createRouter({ history: createWebHashHistory(), routes });
 
 let sudahDiperiksa = false;
+let statusDitanya = false;
 
 router.beforeEach(async (ke) => {
   const sesi = useSesi();
   if (!sudahDiperiksa) {
+    // Folder data tidak bisa dipakai: hanya layar pesan yang boleh tampil.
+    if (!statusDitanya) {
+      galatAwal.value = await panggil<string | null>("status_awal");
+      statusDitanya = true;
+    }
+    if (galatAwal.value) return ke.path === "/galat" ? true : "/galat";
     // Sekali saat aplikasi dibuka: belum pernah disiapkan → wizard; kalau sudah, samakan sesi.
     if (await panggil<boolean>("perlu_setup")) {
       return ke.path === "/setup" ? true : "/setup";
@@ -46,7 +58,7 @@ router.beforeEach(async (ke) => {
     sudahDiperiksa = true;
     await sesi.muat();
   }
-  if (ke.path === "/setup") return "/login";
+  if (ke.path === "/setup" || ke.path === "/galat") return "/login";
   if (ke.meta.publik) return sesi.sesi ? "/" : true;
   if (!sesi.sesi) return "/login";
   if (ke.meta.pemilik && !sesi.pemilik) return "/";
