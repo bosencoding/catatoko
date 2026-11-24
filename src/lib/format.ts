@@ -29,6 +29,16 @@ export function tanggal(iso: string | null | undefined): string {
   return `${m[3]} ${BULAN[Number(m[2]) - 1] ?? m[2]} ${m[1]}`;
 }
 
+/** "2026-09-03" → "03 Sep". */
+export function tanggalPendek(iso: string): string {
+  return tanggal(iso).slice(0, 6);
+}
+
+/** Nilai Rupiah dari jumlah (seperseribu satuan) × harga per satuan; pembulatan sama dengan sisi Rust. */
+export function nilai(milli: number, harga: number): number {
+  return Math.floor((milli * harga + 500) / 1000);
+}
+
 /** "2026-11-24T10:05:00" → "24 Nov 2026 10:05". */
 export function waktu(iso: string): string {
   const jam = /T(\d{2}:\d{2})/.exec(iso);
@@ -78,4 +88,22 @@ export function bacaJumlah(teks: string): number | null {
 /** Teks isian untuk kolom jumlah (tanpa pemisah ribuan agar mudah diedit). */
 export function isiJumlah(milli: number | null): string {
   return milli === null ? "" : jumlah(milli).replace(/\./g, "");
+}
+
+/** Membaca tanggal gaya Indonesia "hari/bulan/tahun" menjadi YYYY-MM-DD. Tidak sah → null. */
+export function bacaTanggal(teks: string): string | null {
+  const m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})$/.exec(teks.trim());
+  if (!m) return null;
+  const [h, b] = [Number(m[1]), Number(m[2])];
+  const t = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+  const d = new Date(Date.UTC(t, b - 1, h));
+  if (d.getUTCFullYear() !== t || d.getUTCMonth() !== b - 1 || d.getUTCDate() !== h) return null;
+  const p = (x: number, n = 2) => x.toString().padStart(n, "0");
+  return `${p(t, 4)}-${p(b)}-${p(h)}`;
+}
+
+/** "2026-09-03" → "03/09/2026" untuk kolom isian tanggal. */
+export function isiTanggal(iso: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? "");
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
 }

@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { bacaRupiah, rupiah } from "@/lib/format";
 
 const props = defineProps<{ modelValue: number | null; wajib?: boolean; placeholder?: string }>();
+defineOptions({ inheritAttrs: false });
 const emit = defineEmits<{ "update:modelValue": [nilai: number | null] }>();
 
 const tampil = (n: number | null) => (n === null ? "" : rupiah(n).replace("Rp ", ""));
@@ -13,7 +14,10 @@ const disentuh = ref(false);
 watch(
   () => props.modelValue,
   (n) => {
-    if (n !== bacaRupiah(teks.value)) teks.value = tampil(n);
+    if (n === bacaRupiah(teks.value)) return;
+    teks.value = tampil(n);
+    // Dikosongkan dari luar (formulir direset): jangan langsung ditandai merah.
+    if (n === null) disentuh.value = false;
   },
 );
 
@@ -32,6 +36,7 @@ function selesai() {
   <div class="relative">
     <span class="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-sm text-muted-foreground">Rp</span>
     <Input
+      v-bind="$attrs"
       :model-value="teks"
       inputmode="numeric"
       class="pl-9 text-right tabular-nums"

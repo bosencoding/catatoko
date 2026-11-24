@@ -64,3 +64,13 @@ pub fn penyesuaian_batal(st: State<AppState>, id: i64, alasan: String) -> Hasil<
 pub fn penyesuaian_daftar(st: State<AppState>, dari: String, sampai: String) -> Hasil<Vec<stok::Penyesuaian>> {
     dengan_sesi(&st, |c, s| stok::daftar_penyesuaian(c, s, &dari, &sampai))
 }
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn masuk_terbaru(st: State<AppState>, batas: u32) -> Hasil<Vec<Kiriman>> {
+    dengan_sesi(&st, |c, s| stok::masuk_terbaru(c, s, batas))
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn keluar_terbaru(st: State<AppState>, batas: u32) -> Hasil<Vec<stok::TransaksiKeluar>> {
+    dengan_sesi(&st, |c, s| stok::keluar_terbaru(c, s, batas))
+}

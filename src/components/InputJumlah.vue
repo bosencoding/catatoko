@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { bacaJumlah, isiJumlah } from "@/lib/format";
 
 const props = defineProps<{ modelValue: number | null; satuan?: string; wajib?: boolean; placeholder?: string }>();
+defineOptions({ inheritAttrs: false });
 const emit = defineEmits<{ "update:modelValue": [nilai: number | null] }>();
 
 const teks = ref(isiJumlah(props.modelValue));
@@ -12,7 +13,10 @@ const disentuh = ref(false);
 watch(
   () => props.modelValue,
   (n) => {
-    if (n !== bacaJumlah(teks.value)) teks.value = isiJumlah(n);
+    if (n === bacaJumlah(teks.value)) return;
+    teks.value = isiJumlah(n);
+    // Dikosongkan dari luar (formulir direset): jangan langsung ditandai merah.
+    if (n === null) disentuh.value = false;
   },
 );
 
@@ -30,6 +34,7 @@ function selesai() {
 <template>
   <div class="relative">
     <Input
+      v-bind="$attrs"
       :model-value="teks"
       inputmode="decimal"
       class="text-right tabular-nums"

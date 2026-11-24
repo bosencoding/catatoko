@@ -207,6 +207,16 @@ pub fn daftar_masuk(conn: &Connection, s: &Sesi, dari: &str, sampai: &str) -> Ha
     Ok(v)
 }
 
+/// Barang masuk yang paling baru DICATAT (bukan menurut tanggal masuk), termasuk yang batal.
+pub fn masuk_terbaru(conn: &Connection, s: &Sesi, batas: u32) -> Hasil<Vec<Kiriman>> {
+    wajib(s, Modul::BarangMasuk, Tingkat::Lihat)?;
+    let hari = waktu::tanggal(&waktu::hari_ini())?;
+    let harga = s.boleh_harga_beli();
+    let mut q = conn.prepare(&format!("{PILIH_KIRIMAN} ORDER BY k.id DESC LIMIT ?1"))?;
+    let v = q.query_map([batas.min(500)], |r| kiriman_dari_baris(r, harga, hari))?.collect::<Result<_, _>>()?;
+    Ok(v)
+}
+
 // ---------------------------------------------------------------------------
 // Barang keluar
 // ---------------------------------------------------------------------------
@@ -373,14 +383,23 @@ pub fn keluar(conn: &Connection, s: &Sesi, m: KeluarMasukan, hari_ini: &str) -> 
 pub fn daftar_keluar(conn: &Connection, s: &Sesi, dari: &str, sampai: &str) -> Hasil<Vec<TransaksiKeluar>> {
     wajib(s, Modul::BarangKeluar, Tingkat::Lihat)?;
     waktu::rentang(dari, sampai)?;
+    muat_transaksi(conn, s, "WHERE t.tanggal BETWEEN ?1 AND ?2 ORDER BY t.tanggal DESC, t.id DESC", params![dari, sampai])
+}
+
+/// Barang keluar yang paling baru DICATAT (bukan menurut tanggal transaksi), termasuk yang batal.
+pub fn keluar_terbaru(conn: &Connection, s: &Sesi, batas: u32) -> Hasil<Vec<TransaksiKeluar>> {
+    wajib(s, Modul::BarangKeluar, Tingkat::Lihat)?;
+    muat_transaksi(conn, s, "ORDER BY t.id DESC LIMIT ?1", params![batas.min(500)])
+}
+
+fn muat_transaksi(conn: &Connection, s: &Sesi, ekor: &str, p: &[&dyn rusqlite::ToSql]) -> Hasil<Vec<TransaksiKeluar>> {
     let harga = s.boleh_harga_beli();
-    let mut q = conn.prepare(
+    let mut q = conn.prepare(&format!(
         "SELECT t.id, t.tanggal, a.nama, t.catatan, t.batal, t.alasan_batal, p.nama
-         FROM transaksi_keluar t JOIN akun_kas a ON a.id=t.akun_kas_id LEFT JOIN pengguna p ON p.id=t.dibuat_oleh
-         WHERE t.tanggal BETWEEN ?1 AND ?2 ORDER BY t.tanggal DESC, t.id DESC",
-    )?;
+         FROM transaksi_keluar t JOIN akun_kas a ON a.id=t.akun_kas_id LEFT JOIN pengguna p ON p.id=t.dibuat_oleh {ekor}"
+    ))?;
     let mut hasil: Vec<TransaksiKeluar> = q
-        .query_map(params![dari, sampai], |r| {
+        .query_map(p, |r| {
             Ok(TransaksiKeluar {
                 id: r.get(0)?,
                 tanggal: r.get(1)?,

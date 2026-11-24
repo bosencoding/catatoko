@@ -2,7 +2,8 @@
 // Digabung di depan berkas skenario oleh uji-ui/jalankan.sh.
 const __invoke = window.__TAURI_INTERNALS__.invoke;
 const tidur = (ms) => new Promise((r) => setTimeout(r, ms));
-const el = (sel) => document.querySelector(`[data-uji="${sel}"]`) || (/^[\w-]+$/.test(sel) ? null : document.querySelector(sel));
+// Nama sederhana = atribut data-uji; selain itu dianggap selektor CSS biasa.
+const el = (sel) => (/^[\w\/.-]+$/.test(sel) ? document.querySelector(`[data-uji="${sel}"]`) : document.querySelector(sel));
 const semua = (sel) => [...document.querySelectorAll(`[data-uji="${sel}"]`)];
 
 async function tunggu(sel, ms = 8000) {
@@ -74,4 +75,41 @@ async function masukSebagai(nama, sandi) {
   await isi("sandi", sandi);
   await klik("masuk");
   await tunggu("keluar");
+}
+
+/** Menyiapkan toko langsung lewat perintah (tanpa wizard) lalu masuk lewat layar login. */
+async function siapkanToko() {
+  await tunggu("nama-toko");
+  await __invoke("setup_awal", { nama_toko: "Toko Mina Jaya", nama_pengguna: "budi", nama: "Pak Budi", sandi: "rahasia123" });
+  location.hash = "#/login";
+  await tunggu("masuk");
+  await masukSebagai("budi", "rahasia123");
+}
+async function ke(jalur, tanda) {
+  location.hash = `#${jalur}`;
+  await tidur(150);
+  if (tanda) await tunggu(tanda);
+}
+/** Memilih barang pada komponen PilihBarang. */
+async function pilihBarang(uji, id) {
+  const e = await tunggu(`pilih-barang-${uji}`);
+  e.focus();
+  e.dispatchEvent(new FocusEvent("focus"));
+  const o = await tunggu(`opsi-barang-${id}`);
+  o.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+  await tidur(250);
+}
+const hariIniIso = () => {
+  const d = new Date();
+  const p = (x) => String(x).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+};
+async function gagal(janji, kode) {
+  try {
+    await janji;
+  } catch (e) {
+    if (e && e.kode === kode) return e;
+    throw new Error(`harap galat ${kode}, nyata ${JSON.stringify(e)}`);
+  }
+  throw new Error(`harap galat ${kode}, tetapi berhasil`);
 }

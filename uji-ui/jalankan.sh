@@ -10,11 +10,11 @@ OUT="${CATAT_UJI_HASIL:-$akar/.dev-data/uji-ui}/$nama"
 DATA="${2:-$OUT/data}"
 rm -rf "$OUT"; mkdir -p "$OUT"
 [ -n "${2:-}" ] || mkdir -p "$DATA"
-cat "$akar/uji-ui/pustaka.js" "$skenario" > "$OUT/skrip.js"
+{ echo "const CONTOH_FOTO = \"$akar/uji-ui/contoh-foto.png\"; const FOLDER_HASIL = \"$OUT\";"; cat "$akar/uji-ui/pustaka.js" "$skenario"; } > "$OUT/skrip.js"
 cat >> "$OUT/skrip.js" <<'JS'
 ;(async () => {
   try { await skenario(); await lapor("selesai.txt", "OK"); }
-  catch (e) { try { await potret("gagal"); } catch (_) {} await lapor("selesai.txt", "GAGAL: " + e.message); }
+  catch (e) { try { await potret("gagal"); } catch (_) {} await lapor("selesai.txt", "GAGAL: " + (e && e.message ? e.message : JSON.stringify(e))); }
 })();
 JS
 CATAT_DATA_DIR="$DATA" CATAT_UJI_JS="$OUT/skrip.js" CATAT_UJI_OUT="$OUT" \

@@ -78,3 +78,29 @@ describe("bacaJumlah", () => {
     expect(bacaJumlah("4,35")).toBe(4350);
   });
 });
+
+import { bacaTanggal, isiTanggal } from "./format";
+
+describe("bacaTanggal", () => {
+  it("membaca hari/bulan/tahun", () => {
+    expect(bacaTanggal("24/11/2026")).toBe("2026-11-24");
+    expect(bacaTanggal("3/9/2026")).toBe("2026-09-03");
+    expect(bacaTanggal("03-09-2026")).toBe("2026-09-03");
+    expect(bacaTanggal(" 31.01.2027 ")).toBe("2027-01-31");
+    expect(bacaTanggal("24/11/26")).toBe("2026-11-24");
+    expect(bacaTanggal("29/02/2028")).toBe("2028-02-29");
+  });
+  it("menolak tanggal yang tidak ada atau tidak jelas", () => {
+    for (const t of ["", "31/02/2026", "29/02/2027", "0/1/2026", "1/13/2026", "2026-11-24", "24/11", "24 Nov 2026", "24/11/126", "aa/bb/cccc"]) {
+      expect(bacaTanggal(t), t).toBeNull();
+    }
+  });
+});
+
+describe("isiTanggal", () => {
+  it("menulis hari/bulan/tahun", () => {
+    expect(isiTanggal("2026-09-03")).toBe("03/09/2026");
+    expect(isiTanggal("")).toBe("");
+    expect(isiTanggal(null)).toBe("");
+  });
+});

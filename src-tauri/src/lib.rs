@@ -81,6 +81,8 @@ macro_rules! daftar_perintah {
             perintah::stok::stok_sesuaikan,
             perintah::stok::penyesuaian_batal,
             perintah::stok::penyesuaian_daftar,
+            perintah::stok::masuk_terbaru,
+            perintah::stok::keluar_terbaru,
             perintah::laporan::ringkasan,
             perintah::laporan::laporan_buat,
             perintah::laporan::laporan_ekspor,

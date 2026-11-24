@@ -226,3 +226,25 @@ fn hak_keluar() {
     assert_eq!(stok::usul_alokasi(&s.c, &tanpa, s.barang, 1_000, HARI_INI).unwrap_err().kode, "TIDAK_BERHAK");
     let _ = masukan_masuk;
 }
+
+#[test]
+fn terbaru_menurut_urutan_pencatatan() {
+    let s = skenario();
+    let p = pemilik();
+    // Kiriman bertanggal lama yang dicatat belakangan harus tetap muncul paling atas.
+    let lama = stok::masuk(&s.c, s.d.path(), &p, masukan_masuk(s.barang, "2025-01-05", 1_000, 1)).unwrap();
+    let m = stok::masuk_terbaru(&s.c, &p, 2).unwrap();
+    assert_eq!(m.iter().map(|k| k.id).collect::<Vec<_>>(), vec![lama, s.nov]);
+    assert_eq!(stok::masuk_terbaru(&s.c, &kasir(), 5).unwrap_err().kode, "TIDAK_BERHAK");
+
+    let a = jual_tiga(&s);
+    let mut mundur = jual(s.barang, 1, &[(s.nov, 1_000)]);
+    mundur.tanggal = "2026-11-21".into();
+    let b = stok::keluar(&s.c, &p, mundur, HARI_INI).unwrap();
+    let k = stok::keluar_terbaru(&s.c, &p, 10).unwrap();
+    assert_eq!(k.iter().map(|t| t.id).collect::<Vec<_>>(), vec![b, a]);
+    assert_eq!(k[1].baris.len(), 2);
+    assert_eq!(stok::keluar_terbaru(&s.c, &p, 1).unwrap().len(), 1);
+    assert_eq!(stok::keluar_terbaru(&s.c, &kasir(), 10).unwrap()[0].laba, None);
+    assert_eq!(stok::keluar_terbaru(&s.c, &staf(&[(Modul::Kas, Tingkat::Ubah)], true), 10).unwrap_err().kode, "TIDAK_BERHAK");
+}
