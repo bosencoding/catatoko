@@ -11,6 +11,7 @@ pub mod auth;
 pub mod barang;
 pub mod kas;
 pub mod pengguna;
+pub mod stok;
 
 /// Menjalankan `f` dengan sesi yang masih berlaku. Sesi yang menganggur terlalu lama dikunci.
 pub fn dengan_sesi<T>(st: &AppState, f: impl FnOnce(&mut Connection, &Sesi) -> Hasil<T>) -> Hasil<T> {

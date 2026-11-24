@@ -11,6 +11,7 @@ pub mod pengaturan;
 pub mod pengguna;
 pub mod perintah;
 pub mod state;
+pub mod stok;
 #[cfg(test)]
 mod uji;
 pub mod waktu;
@@ -79,6 +80,9 @@ pub fn run() {
             p::kas::akun_kas_ubah,
             p::kas::kategori_kas_daftar,
             p::kas::kategori_kas_tambah,
+            p::stok::masuk_tambah,
+            p::stok::masuk_daftar,
+            p::stok::kiriman_barang,
         ])
         .run(tauri::generate_context!())
         .expect("gagal menjalankan aplikasi");
