@@ -113,3 +113,16 @@ async function gagal(janji, kode) {
   }
   throw new Error(`harap galat ${kode}, tetapi berhasil`);
 }
+
+/** Data contoh di spec: satu barang, tiga kiriman (Sep stok awal; Okt & Nov dibayar tunai). */
+async function benihStok() {
+  const id = await __invoke("barang_tambah", { masukan: { kode: "", nama: "Pakan Apung 781-2", kategori_id: null, satuan: "karung", harga_jual: 450000, stok_minimum: 5000, foto_sumber: null, aktif: true } });
+  for (const [tgl, jml, harga, spek, exp, awal] of [
+    ["2026-09-03", 2000, 385000, "protein 30%", "2027-01-31", true],
+    ["2026-10-15", 10000, 392000, "protein 31%", "2027-03-31", false],
+    ["2026-11-20", 20000, 398000, "protein 31%", "2027-05-31", false],
+  ]) {
+    await __invoke("masuk_tambah", { masukan: { barang_id: id, tanggal_masuk: tgl, jumlah: jml, harga_beli: harga, spek, kedaluwarsa: exp, pemasok: "CV Mina", foto_sumber: null, stok_awal: awal, akun_kas_id: awal ? null : 1 } });
+  }
+  return id;
+}

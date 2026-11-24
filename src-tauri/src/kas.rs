@@ -94,7 +94,7 @@ fn id_kategori(conn: &Connection, nama: &str) -> Hasil<i64> {
     Ok(conn.query_row("SELECT id FROM kategori_kas WHERE nama=?1", [nama], |r| r.get(0))?)
 }
 
-fn rupiah(n: i64) -> String {
+pub(crate) fn rupiah(n: i64) -> String {
     let s = n.abs().to_string();
     let mut hasil = String::new();
     for (i, ch) in s.chars().enumerate() {

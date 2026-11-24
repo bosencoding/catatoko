@@ -153,7 +153,8 @@ fn lebar_huruf(c: char, tebal: bool) -> f32 {
         's' | 'c' | 'k' | 'v' | 'x' | 'y' | 'z' => 500.0,
         _ => 556.0,
     };
-    if tebal { w * 1.06 } else { w }
+    // Perkiraan sengaja dilebihkan sedikit: kelebihan hanya menambah jarak, kekurangan memotong teks.
+    if tebal { w * 1.16 } else { w * 1.04 }
 }
 
 const PT_KE_MM: f32 = 0.352_778;
@@ -204,10 +205,14 @@ pub fn pdf(l: &Laporan, tujuan: &Path) -> Hasil<()> {
     let lebar_isi = lebar_hal - 2.0 * TEPI;
     let mut lebar: Vec<f32> = l.kolom.iter().map(|k| lebar_teks(&latin(k), UKURAN, true)).collect();
     let mut kanan = vec![false; n];
-    for baris in l.baris.iter().chain(l.total.iter()) {
+    let mut alami = vec![0.0f32; n];
+    for (baris, tebal_juga) in l.baris.iter().map(|b| (b, false)).chain(l.total.iter().map(|t| (t, true))) {
         for (i, sel) in baris.iter().enumerate().take(n) {
             let (t, angka) = teks_sel(sel);
-            lebar[i] = lebar[i].max(lebar_teks(&t, UKURAN, false)).min(70.0);
+            let w = lebar_teks(&t, UKURAN, tebal_juga);
+            // Angka tidak pernah dipotong; teks panjang dibatasi agar tidak menghabiskan halaman.
+            lebar[i] = lebar[i].max(if angka { w } else { w.min(70.0) });
+            alami[i] = alami[i].max(w);
             kanan[i] = kanan[i] || angka;
         }
     }
@@ -215,12 +220,16 @@ pub fn pdf(l: &Laporan, tujuan: &Path) -> Hasil<()> {
         *w += 2.0 * JARAK;
     }
     let jumlah: f32 = lebar.iter().sum();
-    if jumlah > lebar_isi {
-        let skala = lebar_isi / jumlah;
-        lebar.iter_mut().for_each(|w| *w *= skala);
-    } else if let Some(i) = kanan.iter().position(|k| !*k) {
-        // Sisa ruang diberikan ke kolom teks pertama supaya tabel memenuhi halaman.
-        lebar[i] += lebar_isi - jumlah;
+    // Kolom teks yang isinya paling panjang: tempat menaruh sisa ruang, atau yang dikecilkan bila kelebihan.
+    let lentur = (0..n).filter(|i| !kanan[*i]).max_by(|a, b| alami[*a].total_cmp(&alami[*b]));
+    match lentur {
+        Some(i) if jumlah <= lebar_isi => lebar[i] += lebar_isi - jumlah,
+        Some(i) if lebar[i] - (jumlah - lebar_isi) >= 22.0 => lebar[i] -= jumlah - lebar_isi,
+        _ if jumlah > lebar_isi => {
+            let skala = lebar_isi / jumlah;
+            lebar.iter_mut().for_each(|w| *w *= skala);
+        }
+        _ => {}
     }
     let mut x_kolom = Vec::with_capacity(n);
     let mut x = TEPI;

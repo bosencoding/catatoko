@@ -369,7 +369,7 @@ pub fn keluar(conn: &Connection, s: &Sesi, m: KeluarMasukan, hari_ini: &str) -> 
             total += nilai(a.jumlah, baris.harga_jual);
             jumlah_baris += a.jumlah;
         }
-        ringkas.push(format!("{} {satuan} {nama} @ {}", teks_jumlah(jumlah_baris), baris.harga_jual));
+        ringkas.push(format!("{} {satuan} {nama} @ {}", teks_jumlah(jumlah_baris), kas::rupiah(baris.harga_jual)));
     }
     if total > 0 {
         kas::catat_otomatis(&tx, &m.tanggal, "masuk", m.akun_kas_id, kas::KAT_PENJUALAN, total, &format!("Jual {}", ringkas.join(", ")), "transaksi_keluar", id, s.pengguna_id)?;

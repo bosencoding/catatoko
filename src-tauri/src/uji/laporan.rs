@@ -283,3 +283,26 @@ fn laporan_kosong_dan_teks_aneh_tetap_terekspor() {
     assert_eq!(ekspor::pdf(&l, &s.d.path().join("tidak/ada/x.pdf")).unwrap_err().kode, "VALIDASI");
     assert_eq!(ekspor::xlsx(&l, &s.d.path().join("tidak/ada/x.xlsx")).unwrap_err().kode, "VALIDASI");
 }
+
+#[test]
+fn pdf_tidak_memotong_kepala_dan_total() {
+    let s = benih();
+    let l = laporan::buat(&s.c, &pemilik(), Jenis::LabaKotor, DARI, SAMPAI).unwrap();
+    let f = s.d.path().join("laba.pdf");
+    ekspor::pdf(&l, &f).unwrap();
+    let isi = String::from_utf8_lossy(&std::fs::read(&f).unwrap()).into_owned();
+    // printpdf menulis tiap teks sebagai satu string heksadesimal: <48617267...> Tj
+    let heks = |t: &str| format!("<{}>", t.bytes().map(|b| format!("{b:02X}")).collect::<String>());
+    for utuh in ["Harga beli", "Harga pokok", "188.000", "1.350.000", "Pakan Apung 781-2"] {
+        assert!(isi.contains(&heks(utuh)), "'{utuh}' terpotong atau hilang di PDF");
+    }
+    assert!(!isi.contains(&heks("Harga b..")));
+}
+
+#[test]
+fn keterangan_kas_penjualan_memakai_format_rupiah() {
+    let s = skenario();
+    jual_tiga(&s);
+    let ket: String = s.c.query_row("SELECT keterangan FROM kas WHERE ref_jenis='transaksi_keluar'", [], |r| r.get(0)).unwrap();
+    assert_eq!(ket, "Jual 3 karung Pakan Apung 781-2 @ Rp 450.000");
+}
