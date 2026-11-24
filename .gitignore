@@ -4,3 +4,6 @@ dist-portable/
 .dev-data/
 .superpowers/
 target/
+
+# Hasil uji antarmuka
+.dev-data/

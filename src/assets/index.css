@@ -127,3 +127,16 @@
     @apply font-sans;
     }
 }
+/* Warna utama Catat: hijau-biru air. */
+:root {
+  --primary: oklch(0.48 0.09 200);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.6 0.09 200);
+}
+.dark {
+  --primary: oklch(0.72 0.1 195);
+  --primary-foreground: oklch(0.18 0.02 200);
+  --ring: oklch(0.6 0.09 200);
+}
+html, body, #app { height: 100%; }
+body { overscroll-behavior: none; }
