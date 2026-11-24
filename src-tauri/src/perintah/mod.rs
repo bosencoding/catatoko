@@ -8,6 +8,7 @@ use rusqlite::Connection;
 use std::time::{Duration, Instant};
 
 pub mod auth;
+pub mod barang;
 pub mod pengguna;
 
 /// Menjalankan `f` dengan sesi yang masih berlaku. Sesi yang menganggur terlalu lama dikunci.

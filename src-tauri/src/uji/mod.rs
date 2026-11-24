@@ -2,6 +2,7 @@ use crate::akses::{Modul, Sesi, Tingkat};
 use rusqlite::Connection;
 
 mod auth;
+mod barang;
 mod db;
 
 /// DB memori dengan pemilik (id 1) dan staf (id 2), tanpa lewat Argon2.

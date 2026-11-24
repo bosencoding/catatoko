@@ -1,6 +1,8 @@
 pub mod akses;
 pub mod auth;
+pub mod barang;
 pub mod db;
+pub mod foto;
 pub mod galat;
 pub mod jalur;
 pub mod log;
@@ -29,6 +31,8 @@ pub fn run() {
         .setup(|app| {
             match siapkan_state() {
                 Ok(st) => {
+                    // Tampilan hanya boleh membaca file di dalam data/foto.
+                    let _ = app.asset_protocol_scope().allow_directory(st.data.join("foto"), true);
                     app.manage(st);
                 }
                 Err(e) => {
@@ -56,6 +60,13 @@ pub fn run() {
             p::pengguna::pengguna_ubah,
             p::pengguna::pengguna_atur_ulang_sandi,
             p::pengguna::hak_bawaan_staf,
+            p::barang::barang_daftar,
+            p::barang::barang_ambil,
+            p::barang::barang_tambah,
+            p::barang::barang_ubah,
+            p::barang::kategori_barang_daftar,
+            p::barang::kategori_barang_tambah,
+            p::barang::folder_data,
         ])
         .run(tauri::generate_context!())
         .expect("gagal menjalankan aplikasi");
