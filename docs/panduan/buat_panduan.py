@@ -691,13 +691,13 @@ tanya = [
     ("Foto dari HP tampil miring.", "Versi ini belum membaca arah foto dari kamera. Putar fotonya dulu di HP atau komputer sebelum dipilih."),
 ]
 for t, j in tanya:
-    isi_dokumen.append(KeepTogether([Paragraph(f"<b>{t}</b>", g["isi"]), Paragraph(j, ParagraphStyle("jawab", parent=g["isi"], leftIndent=10, spaceAfter=7, textColor=REDUP))]))
+    isi_dokumen.append(KeepTogether([Paragraph(f"<b>{t}</b>", g["isi"]), Paragraph(j, ParagraphStyle("jawab", parent=g["isi"], leftIndent=10, spaceAfter=3, textColor=REDUP))]))
 
 sub("Kebiasaan yang disarankan")
 butir(
     "Catat transaksi saat terjadi, jangan ditumpuk sampai sore.",
     "Cocokkan saldo Tunai dengan uang di laci tiap tutup toko.",
-    "Hitung ulang stok secara berkala dan catat selisihnya lewat Sesuaikan.",
+    "Hitung ulang stok secara berkala; catat selisihnya lewat Sesuaikan.",
     "Buat cadangan tiap minggu dan simpan salinannya di tempat lain.",
     "Beri tiap staf akun sendiri. Jangan berbagi kata sandi pemilik.",
 )
