@@ -4,6 +4,7 @@ use rusqlite::Connection;
 mod auth;
 mod barang;
 mod db;
+mod kas;
 
 /// DB memori dengan pemilik (id 1) dan staf (id 2), tanpa lewat Argon2.
 pub fn db_uji() -> Connection {

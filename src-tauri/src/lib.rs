@@ -5,6 +5,7 @@ pub mod db;
 pub mod foto;
 pub mod galat;
 pub mod jalur;
+pub mod kas;
 pub mod log;
 pub mod pengaturan;
 pub mod pengguna;
@@ -67,6 +68,17 @@ pub fn run() {
             p::barang::kategori_barang_daftar,
             p::barang::kategori_barang_tambah,
             p::barang::folder_data,
+            p::kas::kas_daftar,
+            p::kas::kas_saldo,
+            p::kas::kas_tambah,
+            p::kas::kas_ubah,
+            p::kas::kas_batal,
+            p::kas::kas_pindah,
+            p::kas::akun_kas_daftar,
+            p::kas::akun_kas_tambah,
+            p::kas::akun_kas_ubah,
+            p::kas::kategori_kas_daftar,
+            p::kas::kategori_kas_tambah,
         ])
         .run(tauri::generate_context!())
         .expect("gagal menjalankan aplikasi");
